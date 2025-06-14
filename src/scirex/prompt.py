@@ -1,4 +1,6 @@
 from scirex.task import Task
+
+
 class PromptTemplate:
     """Configurable prompt templates."""
 
@@ -47,7 +49,7 @@ Answer:""",
         options = []
         letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-        for i, (option, score) in enumerate(task.target.items()):
+        for i, (option, _score) in enumerate(task.target.items()):
             options.append(f"{letters[i]}. {option}")
 
         return self.templates["mcq"].format(question=task.question, options="\n".join(options))

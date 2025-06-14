@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Union
 
 from datasets import load_dataset
 
