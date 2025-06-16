@@ -1,0 +1,19 @@
+model:
+  name: "gemini-2.5-pro-preview-06-05"
+  temperature: 0.0
+  max_output_tokens: 1024
+  thinking_config:
+    thinking_budget: 1024
+
+dataset:
+  name: "your-dataset-name"
+  max_tasks: 100
+
+evaluation:
+  tolerance: 0.01
+  save_results: true
+  output_file: "results.json"
+
+prompts:
+  strategy: "basic" # basic, chain_of_thought, few_shot, expert_role
+  custom_templates: null

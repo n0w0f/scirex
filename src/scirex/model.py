@@ -1,5 +1,16 @@
+import os
+
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+
+# Load environment variables from .env file
+load_dotenv("../../.env")
+
+
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise ValueError("GOOGLE_API_KEY environment variable is not set.")
 
 
 class GeminiModel:
