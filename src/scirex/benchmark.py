@@ -3,12 +3,13 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from datasets import Dataset
 
 from scirex.model import GeminiModel
 from scirex.prompt import PromptTemplate
+from scirex.response import GeminiResponse, TokenUsage  # Add these imports
 from scirex.task import Task
 
 
@@ -93,11 +94,30 @@ class BenchmarkResult:
     """Results from benchmark evaluation."""
 
     task: Task
-    response: str
+    response: str  # Keep for backward compatibility
     parsed_answer: list[str] | float | None
     metrics: dict[str, float]
     success: bool
-    thought_summary: str | None = None
+
+    # Rich response data
+    full_response: Optional[GeminiResponse] = None
+
+    @property
+    def thought_summary(self) -> str | None:
+        """Backward compatibility property."""
+        return self.full_response.thought_summary if self.full_response else None
+
+    @property
+    def token_usage(self) -> TokenUsage | None:
+        """Easy access to token usage."""
+        return self.full_response.token_usage if self.full_response else None
+
+    @property
+    def total_tokens(self) -> int:
+        """Easy access to total token count."""
+        if self.full_response and self.full_response.token_usage:
+            return self.full_response.token_usage.total_token_count
+        return 0
 
 
 class Benchmark:
@@ -126,12 +146,9 @@ class Benchmark:
             else:
                 prompt = self.prompt_template.format_numeric_prompt(task)
 
-            # Get model response
-            if self.include_thoughts:
-                response, thought_summary = self.model.generate(prompt, return_thoughts=True)
-            else:
-                response = self.model.generate(prompt)
-                thought_summary = None
+            # Get full model response with all metadata
+            full_response = self.model.generate(prompt, return_full_response=True)
+            response = full_response.text
 
             # Parse answer
             if task.answer_type == "mcq":
@@ -149,7 +166,7 @@ class Benchmark:
             parsed_answer = None
             metrics = {"accuracy": 0.0}
             success = False
-            thought_summary = None
+            full_response = None
 
         return BenchmarkResult(
             task=task,
@@ -157,7 +174,7 @@ class Benchmark:
             parsed_answer=parsed_answer,
             metrics=metrics,
             success=success,
-            thought_summary=thought_summary,
+            full_response=full_response if success else None,
         )
 
     def run_benchmark(self, dataset: Dataset, max_tasks: int | None = None) -> list[BenchmarkResult]:
@@ -216,6 +233,9 @@ class Benchmark:
 
         # Convert results to serializable format
         serializable_results = []
+        total_tokens = 0
+        total_cost_estimate = 0.0
+
         for result in results:
             result_dict = {
                 "task": {
@@ -229,8 +249,20 @@ class Benchmark:
                 "parsed_answer": result.parsed_answer,
                 "metrics": result.metrics,
                 "success": result.success,
+                # Rich response data
+                "full_response": result.full_response.to_dict() if result.full_response else None,
+                # Convenience fields (for easy access without drilling into full_response)
                 "thought_summary": result.thought_summary,
+                "total_tokens": result.total_tokens,
+                "model_version": result.full_response.model_version if result.full_response else None,
+                "finish_reason": result.full_response.finish_reason if result.full_response else None,
             }
+
+            # Track totals for summary
+            if result.full_response:
+                total_tokens += result.total_tokens
+                total_cost_estimate += result.full_response.get_cost_estimate()
+
             serializable_results.append(result_dict)
 
         # Prepare output data
@@ -240,16 +272,65 @@ class Benchmark:
                 "total_results": len(results),
                 "include_thoughts": self.include_thoughts,
                 "tolerance": self.tolerance,
+                "total_tokens_used": total_tokens,
+                "estimated_total_cost": round(total_cost_estimate, 4),
             },
             "results": serializable_results,
         }
 
         # Add summary metrics if requested
         if include_summary:
-            output_data["summary_metrics"] = self.compute_summary_metrics(results)
+            summary_metrics = self.compute_summary_metrics(results)
+            summary_metrics["token_stats"] = self._compute_token_stats(results)
+            output_data["summary_metrics"] = summary_metrics
 
         # Save to file
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(output_data, f, indent=2, ensure_ascii=False)
 
         print(f"Results saved to {output_path}")
+        print(f"Total tokens used: {total_tokens:,}")
+        print(f"Estimated cost: ${total_cost_estimate:.4f}")
+
+    def _compute_token_stats(self, results: list[BenchmarkResult]) -> dict[str, Any]:
+        """Compute token usage statistics (basic version for compatibility)."""
+        token_stats = {
+            "total_tokens": 0,
+            "total_prompt_tokens": 0,
+            "total_response_tokens": 0,
+            "total_thought_tokens": 0,
+            "avg_tokens_per_task": 0,
+            "max_tokens_single_task": 0,
+            "min_tokens_single_task": 0,
+        }
+
+        # If your BenchmarkResult doesn't have token tracking, return empty stats
+        if not hasattr(results[0], "total_tokens") if results else True:
+            return token_stats
+
+        valid_results = [r for r in results if hasattr(r, "total_tokens") and r.total_tokens > 0]
+
+        if not valid_results:
+            return token_stats
+
+        for result in valid_results:
+            token_stats["total_tokens"] += getattr(result, "total_tokens", 0)
+            # Add other token types if available
+            token_stats["max_tokens_single_task"] = max(
+                token_stats["max_tokens_single_task"], getattr(result, "total_tokens", 0)
+            )
+            if token_stats["min_tokens_single_task"] == 0:
+                token_stats["min_tokens_single_task"] = getattr(result, "total_tokens", 0)
+            else:
+                token_stats["min_tokens_single_task"] = min(
+                    token_stats["min_tokens_single_task"], getattr(result, "total_tokens", 0)
+                )
+
+        if valid_results:
+            token_stats["avg_tokens_per_task"] = token_stats["total_tokens"] / len(valid_results)
+
+        return token_stats
+
+    def load_results_from_json(self, input_path: str | Path) -> tuple[list[BenchmarkResult], dict[str, Any]]:
+        """Load benchmark results from JSON file."""
+        pass
