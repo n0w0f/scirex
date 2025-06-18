@@ -1,5 +1,8 @@
+import json
 import re
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from datasets import Dataset
@@ -94,17 +97,25 @@ class BenchmarkResult:
     parsed_answer: list[str] | float | None
     metrics: dict[str, float]
     success: bool
+    thought_summary: str | None = None
 
 
 class Benchmark:
     """Main benchmark orchestrator."""
 
-    def __init__(self, model: GeminiModel, prompt_template: PromptTemplate | None = None, tolerance: float = 0.01):
+    def __init__(
+        self,
+        model: GeminiModel,
+        prompt_template: PromptTemplate | None = None,
+        tolerance: float = 0.01,
+        include_thoughts: bool = False,
+    ):
         self.model = model
         self.prompt_template = prompt_template or PromptTemplate()
         self.parser = LLMParser(model, self.prompt_template)
         self.evaluator = Evaluator()
         self.tolerance = tolerance
+        self.include_thoughts = include_thoughts
 
     def run_single_task(self, task: Task) -> BenchmarkResult:
         """Run benchmark on a single task."""
@@ -116,7 +127,11 @@ class Benchmark:
                 prompt = self.prompt_template.format_numeric_prompt(task)
 
             # Get model response
-            response = self.model.generate(prompt)
+            if self.include_thoughts:
+                response, thought_summary = self.model.generate(prompt, return_thoughts=True)
+            else:
+                response = self.model.generate(prompt)
+                thought_summary = None
 
             # Parse answer
             if task.answer_type == "mcq":
@@ -134,9 +149,15 @@ class Benchmark:
             parsed_answer = None
             metrics = {"accuracy": 0.0}
             success = False
+            thought_summary = None
 
         return BenchmarkResult(
-            task=task, response=response, parsed_answer=parsed_answer, metrics=metrics, success=success
+            task=task,
+            response=response,
+            parsed_answer=parsed_answer,
+            metrics=metrics,
+            success=success,
+            thought_summary=thought_summary,
         )
 
     def run_benchmark(self, dataset: Dataset, max_tasks: int | None = None) -> list[BenchmarkResult]:
@@ -186,3 +207,49 @@ class Benchmark:
             summary["numeric"] = numeric_metrics
 
         return summary
+
+    def save_results_to_json(
+        self, results: list[BenchmarkResult], output_path: str | Path, include_summary: bool = True
+    ) -> None:
+        """Save benchmark results to JSON file."""
+        output_path = Path(output_path)
+
+        # Convert results to serializable format
+        serializable_results = []
+        for result in results:
+            result_dict = {
+                "task": {
+                    "uuid": result.task.uuid,
+                    "name": result.task.name,
+                    "answer_type": result.task.answer_type,
+                    "target": result.task.target,
+                    # Add other task fields as needed
+                },
+                "response": result.response,
+                "parsed_answer": result.parsed_answer,
+                "metrics": result.metrics,
+                "success": result.success,
+                "thought_summary": result.thought_summary,
+            }
+            serializable_results.append(result_dict)
+
+        # Prepare output data
+        output_data = {
+            "metadata": {
+                "timestamp": datetime.now().isoformat(),
+                "total_results": len(results),
+                "include_thoughts": self.include_thoughts,
+                "tolerance": self.tolerance,
+            },
+            "results": serializable_results,
+        }
+
+        # Add summary metrics if requested
+        if include_summary:
+            output_data["summary_metrics"] = self.compute_summary_metrics(results)
+
+        # Save to file
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(output_data, f, indent=2, ensure_ascii=False)
+
+        print(f"Results saved to {output_path}")
