@@ -6,64 +6,170 @@
 [![Commit activity](https://img.shields.io/github/commit-activity/m/n0w0f/scirex)](https://img.shields.io/github/commit-activity/m/n0w0f/scirex)
 [![License](https://img.shields.io/github/license/n0w0f/scirex)](https://img.shields.io/github/license/n0w0f/scirex)
 
-This is the repository for the project SciResearchBench.
+# SciRex: Scientific Research Benchmarking Framework
 
-- **Github repository**: <https://github.com/n0w0f/scirex/>
-- **Documentation** <https://n0w0f.github.io/scirex/>
+A Python framework for benchmarking large language models on scientific research tasks with support for both text-only and multimodal content.
 
-## Getting started with your project
+## Features
 
-### 1. Create a New Repository
+- 🔬 **Scientific Focus**: Designed for chemistry, materials science, and other scientific domains
+- 🖼️ **Multimodal Support**: Handle text + image tasks seamlessly
+- 🚀 **Easy Integration**: Simple API for custom datasets and models
 
-First, create a repository on GitHub with the same name as this project, and then run the following commands:
+- 📊 **Agent for Reward** : (Incoming)
+- 📊 **CoT Faithfulness** : (Incoming)
 
-```bash
-git init -b main
-git add .
-git commit -m "init commit"
-git remote add origin git@github.com:n0w0f/scirex.git
-git push -u origin main
-```
+## Installation
 
-### 2. Set Up Your Development Environment
-
-Then, install the environment and the pre-commit hooks with
+### Using uv (Recommended)
 
 ```bash
-make install
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create a new project
+uv init scirex
+cd scirex
+
+# Add scirex as a dependency
+uv add git+https://github.com/n0w0f/scirex.git
+
 ```
 
-This will also generate your `uv.lock` file
-
-### 3. Run the pre-commit hooks
-
-Initially, the CI/CD pipeline might be failing due to formatting issues. To resolve those run:
+### Using pip
 
 ```bash
-uv run pre-commit run -a
+pip install git+https://github.com/n0w0f/scirex.git
 ```
 
-### 4. Commit the changes
+## Quick Start
 
-Lastly, commit the changes made by the two steps above to your repository.
+### Setup
+
+Create a `.env` file with your API key:
 
 ```bash
-git add .
-git commit -m 'Fix formatting issues'
-git push origin main
+GOOGLE_API_KEY=your_gemini_api_key_here
 ```
 
-You are now ready to start development on your project!
-The CI/CD pipeline will be triggered when you open a pull request, merge to main, or when you create a new release.
+### Text-Only Benchmark
 
-To finalize the set-up for publishing to PyPI, see [here](https://fpgmaas.github.io/cookiecutter-uv/features/publishing/#set-up-for-pypi).
-For activating the automatic documentation with MkDocs, see [here](https://fpgmaas.github.io/cookiecutter-uv/features/mkdocs/#enabling-the-documentation-on-github).
-To enable the code coverage reports, see [here](https://fpgmaas.github.io/cookiecutter-uv/features/codecov/).
-
-## Releasing a new version
+```python
+from scirex import Dataset, GeminiModel, Benchmark, PromptTemplate
 
 
+model = GeminiModel("gemini-2.5-flash")
+prompt_template = PromptTemplate()
+benchmark = Benchmark(model, prompt_template)
 
----
 
-Repository initiated with [fpgmaas/cookiecutter-uv](https://github.com/fpgmaas/cookiecutter-uv).
+dataset = Dataset("your-org/chemistry-qa-dataset")
+
+# Run benchmark
+results = benchmark.run_benchmark(dataset, max_tasks=10)
+
+# View results
+summary = benchmark.compute_summary_metrics(results)
+print(f"Overall accuracy: {summary['success_rate']:.2f}")
+```
+
+### Multimodal Benchmark
+
+```python
+from scirex import Dataset, GeminiModel, Benchmark, PromptTemplate
+
+model = GeminiModel("gemini-2.5-flash")  # Ensure model supports vision
+benchmark = Benchmark(model, test_multimodal=True)
+
+# Load multimodal dataset (images + text)
+dataset = Dataset("jablonkagroup/MaCBench", "material_science")
+
+# Run benchmark - automatically detects and handles multimodal content
+results = benchmark.run_benchmark(dataset, max_tasks=5)
+
+
+# Save detailed results
+benchmark.save_results_to_json(results, "benchmark_results.json")
+```
+
+### Custom Multimodal Task
+
+```python
+from scirex.task import Task
+
+# Create a custom multimodal task
+task = Task(
+    uuid="custom-001",
+    name="Molecule Analysis",
+    description="Analyze molecular structure in image",
+    question="",  # Auto-filled from template
+    answer_type="numeric",
+    target=6.0,  # Expected answer
+    keywords=["chemistry", "molecules"],
+    is_multimodal=True,
+    input_template="Analyze {type1} {entry1}. How many carbon atoms are visible?",
+    qentries_modality={
+        "vision": {
+            "type1": {"type": "text", "value": "this molecular structure"},
+            "entry1": {"type": "image", "value": "data:image/png;base64,..."}
+        }
+    }
+)
+
+# Run single task
+result = benchmark.run_single_task(task)
+print(f"Predicted: {result.parsed_answer}, Actual: {task.target}")
+```
+
+## Supported Dataset Formats
+
+### Text-Only Format
+
+```json
+{
+  "input": "What is the molecular formula of water?",
+  "target_scores": { "H2O": 1.0, "CO2": 0.0, "CH4": 0.0 }
+}
+```
+
+### Multimodal Format
+
+```json
+{
+  "input": "{type1} {entry1} shows a molecule. What is its formula?",
+  "qentries_modality": {
+    "image": {
+      "type1": { "type": "text", "value": "The image" },
+      "entry1": { "type": "image", "value": "data:image/png;base64,..." }
+    }
+  },
+  "target_scores": { "H2O": 1.0, "CO2": 0.0 }
+}
+```
+
+## Documentation
+
+For detailed documentation, examples, and API reference, visit: [https://your-org.github.io/scirex](https://your-org.github.io/scirex)
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Citation
+
+```bibtex
+@software{scirex2024,
+  title={SciRex: Scientific Research Benchmarking Framework},
+  author={Your Name},
+  year={2024},
+  url={https://github.com/your-org/scirex}
+}
+```
