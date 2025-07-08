@@ -17,10 +17,11 @@ if not GOOGLE_API_KEY:
 class GeminiModel:
     """Wrapper for Gemini API."""
 
-    def __init__(self, model_name: str = "gemini-2.5-pro-preview-06-05", **config):
+    def __init__(self, model_name: str = "gemini-2.5-pro-preview-06-05", delay: int = 2, **config):
         self.client = genai.Client()
         self.model_name = model_name
         self.config = types.GenerateContentConfig(**config)
+        self.delay = delay
 
     def generate(self, prompt: str, return_full_response: bool = False) -> str | GeminiResponse:
         """
@@ -35,6 +36,11 @@ class GeminiModel:
             str if return_full_response=False
             GeminiResponse if return_full_response=True
         """
+        # add delay
+        if self.delay > 0:
+            import time
+
+            time.sleep(self.delay)
         raw_response = self.client.models.generate_content(model=self.model_name, contents=prompt, config=self.config)
 
         if return_full_response:

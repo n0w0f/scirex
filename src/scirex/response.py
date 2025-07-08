@@ -122,6 +122,9 @@ class GeminiResponse:
         if not self.token_usage:
             return 0.0
 
-        input_cost = (self.token_usage.prompt_token_count / 1000) * input_cost_per_1k
-        output_cost = (self.token_usage.candidates_token_count / 1000) * output_cost_per_1k
+        prompt_tokens = self.token_usage.prompt_token_count or 0
+        candidate_tokens = self.token_usage.candidates_token_count or 0
+
+        input_cost = (prompt_tokens / 1000) * input_cost_per_1k
+        output_cost = (candidate_tokens / 1000) * output_cost_per_1k
         return input_cost + output_cost
