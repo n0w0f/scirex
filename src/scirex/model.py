@@ -1,4 +1,6 @@
+import base64
 import os
+from typing import Any
 
 from dotenv import load_dotenv
 from google import genai
@@ -44,16 +46,42 @@ class GeminiModel:
 
             time.sleep(self.delay)
 
-        # Prepare content for API
-        content = self._prepare_content(prompt)
+        # Prepare contents using ternary operator
+        contents = self._prepare_multimodal_content(prompt) if isinstance(prompt, list) else prompt
 
         # Generate response
-        raw_response = self.client.models.generate_content(model=self.model_name, contents=content, config=self.config)
+        raw_response = self.client.models.generate_content(model=self.model_name, contents=contents, config=self.config)
 
         if return_full_response:
             return GeminiResponse.from_api_response(raw_response)
         else:
             return raw_response.text
+
+    def _base64_to_image_part(self, base64_data: str, mime_type: str = "image/png"):
+        # Remove data URL prefix if present
+        if base64_data.startswith("data:"):
+            _, base64_content = base64_data.split(",", 1)
+            data_prefix = base64_data.split(",")[0]
+            if ";" in data_prefix and ":" in data_prefix:
+                mime_type = data_prefix.split(";")[0].split(":", 1)[1]
+        else:
+            base64_content = base64_data
+
+        image_bytes = base64.b64decode(base64_content)
+        return types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+
+    def _prepare_multimodal_content(self, content_parts: list[Any]):
+        prepared_content = []
+        for part in content_parts:
+            if isinstance(part, str):
+                prepared_content.append(part)
+            elif isinstance(part, dict) and part.get("type") == "image":
+                base64_data = part.get("data", "")
+                image_part = self._base64_to_image_part(base64_data)
+                prepared_content.append(image_part)
+            else:
+                prepared_content.append(str(part))
+        return prepared_content
 
     def _prepare_content(self, prompt: str | list) -> str | list:
         """
@@ -122,3 +150,35 @@ class GeminiModel:
             combined_content.append(f"\n\n{prompt_text}")
 
         return self.generate(combined_content, return_full_response)
+
+    def test_multimodal_capability(self) -> bool:
+        """
+        Test if the model supports multimodal input.
+
+        Returns:
+            True if multimodal is supported, False otherwise
+        """
+        try:
+            # Create a small test image (1x1 red pixel PNG)
+            test_base64 = (
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+            )
+
+            # Decode base64 to bytes
+            import base64
+
+            image_bytes = base64.b64decode(test_base64)
+
+            # Create image part
+            test_part = types.Part.from_bytes(data=image_bytes, mime_type="image/png")
+
+            # Try a simple multimodal request
+            test_content = [test_part, "What do you see?"]
+            response = self.client.models.generate_content(
+                model=self.model_name, contents=test_content, config=self.config
+            )
+
+            return len(response.text.strip()) > 0
+        except Exception as e:
+            print(f"Multimodal test failed: {e}")
+            return False

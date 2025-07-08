@@ -34,74 +34,97 @@ class Task:
 
     # New multimodal fields
     is_multimodal: bool = False
-    input_template: Optional[str] = None  # Template with placeholders like "{type1} {entry1}"
-    qentries_modality: Optional[dict[str, Any]] = None  # Modality entries
-    selected_entries: Optional[list[str]] = None  # Which entries are used
+    input_template: str | None = None  # Template like "{type1} {entry1} is an image..."
+    qentries_modality: dict[str, Any] | None = None  # Modality entries
+    selected_entries: list[str] | None = None  # Which entries are used
+    resolved_content: list[Any] | None = None  # Resolved content for API calls
 
-    def resolve_multimodal_content(self) -> list[Union[str, dict[str, Any]]]:
-        """
-        Resolve multimodal content for API consumption.
-        Returns list of content parts (strings for text, dicts for images).
-        """
+    def get_text_content(self) -> str:
+        """Get the text-only version of the content for parsing."""
         if not self.is_multimodal:
+            return self.question
+
+        content_parts = self.resolve_multimodal_content()
+        # Extract only text parts
+        text_parts = []
+        for part in content_parts:
+            if isinstance(part, str):
+                text_parts.append(part)
+            elif isinstance(part, dict) and part.get("type") == "image":
+                text_parts.append("[IMAGE]")  # Placeholder for image in text
+
+        return " ".join(text_parts)
+
+    def resolve_multimodal_content(self) -> list[Any]:
+        """
+        Resolve template placeholders with actual content.
+        Returns list of content parts suitable for Gemini API.
+        """
+        if not self.is_multimodal or not self.input_template or not self.qentries_modality:
             return [self.question]
 
-        # Start with the input template
-        resolved_template = self.input_template
-        image_parts = []
+        if self.resolved_content is not None:
+            return self.resolved_content
 
-        # Process each selected entry
-        if self.qentries_modality and self.selected_entries:
-            for entry_group in self.selected_entries:
-                if entry_group in self.qentries_modality:
-                    entries = self.qentries_modality[entry_group]
-
-                    # Replace placeholders in template
-                    for placeholder, entry_data in entries.items():
-                        placeholder_key = f"{{{placeholder}}}"
-
-                        if entry_data["type"] == "text":
-                            # Replace text placeholders directly
-                            resolved_template = resolved_template.replace(placeholder_key, entry_data["value"])
-                        elif entry_data["type"] == "image":
-                            # For images, replace with a marker and collect image data
-                            image_marker = f"[IMAGE_{len(image_parts)}]"
-                            resolved_template = resolved_template.replace(placeholder_key, image_marker)
-
-                            # Parse base64 image
-                            image_data = self._parse_base64_image(entry_data["value"])
-                            if image_data:
-                                image_parts.append({
-                                    "marker": image_marker,
-                                    "data": image_data["data"],
-                                    "mime_type": image_data["mime_type"],
-                                })
-
-        # Build final content list
+        # Start with the template
+        resolved_text = self.input_template
         content_parts = []
 
-        if image_parts:
-            # Split text by image markers and interleave with images
-            text_parts = resolved_template
-            for image_part in image_parts:
-                if image_part["marker"] in text_parts:
-                    before, after = text_parts.split(image_part["marker"], 1)
-                    if before.strip():
-                        content_parts.append(before.strip())
-                    content_parts.append({
-                        "type": "image",
-                        "data": image_part["data"],
-                        "mime_type": image_part["mime_type"],
-                    })
-                    text_parts = after
+        # Find all placeholders in the template
+        import re
 
-            # Add remaining text
-            if text_parts.strip():
-                content_parts.append(text_parts.strip())
+        placeholders = re.findall(r"\{(\w+)\}", self.input_template)
+
+        # Track which parts need to be replaced with images
+        image_placeholders = {}
+
+        # Process each modality category
+        for category, entries in self.qentries_modality.items():
+            for placeholder, entry_data in entries.items():
+                if placeholder in placeholders:
+                    entry_type = entry_data.get("type", "text")
+                    entry_value = entry_data.get("value", "")
+
+                    if entry_type == "text":
+                        # Replace text placeholders directly
+                        resolved_text = resolved_text.replace(f"{{{placeholder}}}", entry_value)
+                    elif entry_type == "image":
+                        # Mark image placeholders for special handling
+                        image_placeholders[placeholder] = entry_value
+                        # For now, replace with a marker
+                        resolved_text = resolved_text.replace(f"{{{placeholder}}}", f"[IMAGE_{placeholder}]")
+
+        # If we have images, we need to create a mixed content list
+        if image_placeholders:
+            # Split text by image markers and create content parts
+            parts = []
+            current_text = resolved_text
+
+            for placeholder, base64_data in image_placeholders.items():
+                marker = f"[IMAGE_{placeholder}]"
+                if marker in current_text:
+                    # Split at the marker
+                    before, after = current_text.split(marker, 1)
+
+                    # Add text before image (if any)
+                    if before.strip():
+                        parts.append(before.strip())
+
+                    # Add image part
+                    parts.append({"type": "image", "data": base64_data})
+
+                    current_text = after
+
+            # Add remaining text (if any)
+            if current_text.strip():
+                parts.append(current_text.strip())
+
+            content_parts = parts
         else:
             # No images, just return the resolved text
-            content_parts.append(resolved_template)
+            content_parts = [resolved_text]
 
+        self.resolved_content = content_parts
         return content_parts
 
     def _parse_base64_image(self, data_url: str) -> Optional[dict[str, Any]]:
