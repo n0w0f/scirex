@@ -9,44 +9,93 @@ copyright: Maintained by <a href="https://n0w0f.com">n0w0f</a>.
 
 nav:
   - Home: index.md
-  - Modules: modules.md
-plugins:
-  - search
-  - mkdocstrings:
-      handlers:
-        python:
-          paths: ["src/scirex"]
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+      - First Benchmark: getting-started/first-benchmark.md
+  - User Guides:
+      - Text Benchmarks: guides/text-benchmarks.md
+      - Multimodal Benchmarks: guides/multimodal-benchmarks.md
+      - Custom Datasets: guides/custom-datasets.md
+      - Custom Models: guides/custom-models.md
+      - Advanced Usage: guides/advanced-usage.md
+  - API Reference:
+      - Dataset: api-reference/dataset.md
+      - Model: api-reference/model.md
+      - Benchmark: api-reference/benchmark.md
+      - Task: api-reference/task.md
+      - Prompt: api-reference/prompt.md
+  - Examples:
+      - Chemistry Q&A: examples/chemistry-qa.md
+      - Materials Science: examples/materials-science.md
+      - Biology Images: examples/biology-images.md
+      - Custom Evaluations: examples/custom-evaluations.md
+  - Datasets:
+      - Supported Formats: datasets/supported-formats.md
+      - Creating Datasets: datasets/creating-datasets.md
+      - Data Preprocessing: datasets/data-preprocessing.md
+  - Deployment:
+      - GitHub Actions: deployment/github-actions.md
+      - Docker: deployment/docker.md
+      - Scaling: deployment/scaling.md
+
 theme:
   name: material
-  feature:
-    tabs: true
   palette:
-    - media: "(prefers-color-scheme: light)"
-      scheme: default
-      primary: white
-      accent: deep orange
+    # Palette toggle for light mode
+    - scheme: default
+      primary: blue
+      accent: light blue
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
-    - media: "(prefers-color-scheme: dark)"
-      scheme: slate
-      primary: black
-      accent: deep orange
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: blue
+      accent: light blue
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
-  icon:
-    repo: fontawesome/brands/github
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - mermaid2
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
 
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/n0w0f/scirex
+      link: https://github.com/your-org/scirex
     - icon: fontawesome/brands/python
-      link: https://pypi.org/project/scirex
-
-markdown_extensions:
-  - toc:
-      permalink: true
-  - pymdownx.arithmatex:
-      generic: true
+      link: https://pypi.org/project/scirex/
+  version:
+    provider: mike
