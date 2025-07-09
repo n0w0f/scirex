@@ -417,6 +417,6 @@ print(f"Metrics: {result.metrics}")
 
 ## Next Steps
 
-- **[Custom Datasets](custom-datasets.md)**: Create your own multimodal evaluation sets
-- **[Advanced Usage](advanced-usage.md)**: Power user features and optimizations
-- **[API Reference](../api-reference/task.md)**: Detailed Task class documentation
+- **Create Custom Datasets**: Create your own multimodal evaluation sets
+- **Advanced Usage**: Power user features and optimizations
+- **[Task API Reference](../api-reference/task.md)**: Detailed Task class documentation
