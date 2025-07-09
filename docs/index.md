@@ -1,8 +1,225 @@
-# scirex
+# SciRex: Scientific Research Benchmarking Framework
 
 [![Release](https://img.shields.io/github/v/release/n0w0f/scirex)](https://img.shields.io/github/v/release/n0w0f/scirex)
 [![Build status](https://img.shields.io/github/actions/workflow/status/n0w0f/scirex/main.yml?branch=main)](https://github.com/n0w0f/scirex/actions/workflows/main.yml?query=branch%3Amain)
 [![Commit activity](https://img.shields.io/github/commit-activity/m/n0w0f/scirex)](https://img.shields.io/github/commit-activity/m/n0w0f/scirex)
 [![License](https://img.shields.io/github/license/n0w0f/scirex)](https://img.shields.io/github/license/n0w0f/scirex)
 
-This is the repository for the project SciResearchBench.
+Welcome to **SciRex**, a comprehensive Python framework for benchmarking large language models on scientific research tasks. Whether you're working with text-only questions or complex multimodal content involving images and text, SciRex provides the tools you need for rigorous evaluation.
+
+## 🚀 Quick Start
+
+```python
+from scirex import Dataset, GeminiModel, Benchmark
+
+# Load your scientific dataset
+dataset = Dataset("n0w0f/chemistry-dataset")
+
+# Initialize model and benchmark
+model = GeminiModel("gemini-2.5-flash")
+benchmark = Benchmark(model)
+
+# Run evaluation
+results = benchmark.run_benchmark(dataset, max_tasks=100)
+print(f"Accuracy: {benchmark.compute_summary_metrics(results)['success_rate']:.2%}")
+```
+
+## ✨ Key Features
+
+### 🔬 **Scientific Focus**
+
+- Built specifically for scientific domains (chemistry, biology, materials science)
+- Handles domain-specific evaluation metrics and data formats
+- Support for molecular structures, experimental data, and research papers
+
+### 🖼️ **Multimodal Support**
+
+- Seamlessly process multimodal content
+- Automatic detection of content types
+- Support for molecular diagrams, microscopy images, charts, and graphs
+
+### 📊 **Comprehensive Metrics**
+
+- **Accuracy**: Exact match scoring
+- **Precision/Recall/F1**: For multi-choice questions
+- **MAE**: For numerical predictions
+- **Modality Breakdown**: Separate metrics for text vs multimodal tasks
+
+### 🛠️ **Easy Integration**
+
+- Simple Python API
+- Support for HuggingFace datasets
+- Extensible for custom models and metrics
+
+## 🎯 Use Cases
+
+!!! example "Research Applications"
+
+    **Chemistry Research**
+
+    - Molecular structure recognition and analysis
+    - Chemical reaction prediction from diagrams
+    - Literature review and knowledge extraction
+
+    **Materials Science**
+
+    - Crystal structure identification
+    - Microstructure analysis from SEM/TEM images
+    - Property prediction from structural data
+
+    **Biology**
+
+    - Cell morphology classification
+    - Protein structure analysis
+    - Medical image interpretation
+
+## 📚 What's in the Documentation
+
+### For Beginners
+
+- **[Installation Guide](getting-started/installation.md)**: Set up SciRex with uv, pip, or conda
+- **[Quick Start](getting-started/quickstart.md)**: Run your first benchmark in 5 minutes
+- **[First Benchmark](getting-started/first-benchmark.md)**: Step-by-step tutorial
+
+### For Practitioners
+
+- **[Text Benchmarks](guides/text-benchmarks.md)**: Traditional Q&A evaluation
+- **[Multimodal Benchmarks](guides/multimodal-benchmarks.md)**: Image + text tasks
+- **[Custom Datasets](guides/custom-datasets.md)**: Create your own evaluation sets
+
+### For Developers
+
+- **[API Reference](api-reference/dataset.md)**: Complete class and method documentation
+- **[Custom Models](guides/custom-models.md)**: Integrate your own LLMs
+- **[Advanced Usage](guides/advanced-usage.md)**: Power user features
+
+## 🔧 Installation
+
+=== "uv (Recommended)"
+
+    ```bash
+    # Install uv
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    # Add SciRex to your project
+    uv add git+https://github.com/n0w0f/scirex.git
+    uv add python-dotenv google-genai datasets pillow
+    ```
+
+=== "pip"
+
+    ```bash
+    pip install git+https://github.com/n0w0f/scirex.git
+    pip install python-dotenv google-genai datasets pillow
+    ```
+
+=== "conda"
+
+    ```bash
+    conda install pip
+    pip install git+https://github.com/n0w0f/scirex.git
+    conda install python-dotenv pillow
+    pip install google-genai datasets
+    ```
+
+## 🎬 Example Gallery
+
+### Text-Only Benchmark
+
+```python
+from scirex import Dataset, GeminiModel, Benchmark
+
+# Chemistry Q&A evaluation
+dataset = Dataset("chemqa/chemistry-questions")
+model = GeminiModel("gemini-2.5-flash")
+benchmark = Benchmark(model)
+
+results = benchmark.run_benchmark(dataset)
+summary = benchmark.compute_summary_metrics(results)
+print(f"Chemistry Q&A Accuracy: {summary['success_rate']:.2%}")
+```
+
+### Multimodal Benchmark
+
+```python
+# Materials science with images
+dataset = Dataset("matsci/crystal-structures")
+model = GeminiModel("gemini-2.5-flash")  # Vision-enabled model
+benchmark = Benchmark(model, test_multimodal=True)
+
+results = benchmark.run_benchmark(dataset)
+
+# Analyze by content type
+text_acc = sum(r.metrics['accuracy'] for r in results if not r.is_multimodal) / len([r for r in results if not r.is_multimodal])
+image_acc = sum(r.metrics['accuracy'] for r in results if r.is_multimodal) / len([r for r in results if r.is_multimodal])
+
+print(f"Text Accuracy: {text_acc:.2%}")
+print(f"Image Accuracy: {image_acc:.2%}")
+```
+
+### Custom Evaluation
+
+```python
+from scirex.task import Task
+
+# Create custom molecular analysis task
+task = Task(
+    uuid="mol-001",
+    name="Benzene Ring Count",
+    description="Count benzene rings in molecular structure",
+    answer_type="numeric",
+    target=2.0,
+    keywords=["chemistry", "organic"],
+    is_multimodal=True,
+    input_template="In {type1} {entry1}, how many benzene rings are present?",
+    qentries_modality={
+        "structure": {
+            "type1": {"type": "text", "value": "this molecular structure"},
+            "entry1": {"type": "image", "value": "data:image/png;base64,..."}
+        }
+    }
+)
+
+result = benchmark.run_single_task(task)
+print(f"Predicted: {result.parsed_answer} rings, Actual: {task.target} rings")
+```
+
+## 📈 Performance Insights
+
+```mermaid
+graph TD
+    A[Input Dataset] --> B{Content Type?}
+    B -->|Text Only| C[Text Pipeline]
+    B -->|Multimodal| D[Multimodal Pipeline]
+    C --> E[Text Prompt Generation]
+    D --> F[Mixed Content Preparation]
+    E --> G[Model Generation]
+    F --> G
+    G --> H[Response Parsing]
+    H --> I[Metric Calculation]
+    I --> J[Results Analysis]
+```
+
+## 🤝 Community
+
+- **GitHub**: [Issues](https://github.com/n0w0f/scirex/issues) and [Discussions](https://github.com/n0w0f/scirex/discussions)
+- **Examples**: Community-contributed benchmarks and datasets
+- **Contributing**: See our [Contributing Guide](https://github.com/n0w0f/scirex/blob/main/CONTRIBUTING.md)
+
+## 📄 Citation
+
+If you use SciRex in your research, please cite:
+
+```bibtex
+@software{scirex2024,
+  title={SciRex: Scientific Research Benchmarking Framework},
+  author={Your Name and Contributors},
+  year={2024},
+  url={https://github.com/n0w0f/scirex},
+  version={1.0.0}
+}
+```
+
+---
+
+Ready to get started? Head to the **[Installation Guide](getting-started/installation.md)** or jump into the **[Quick Start](getting-started/quickstart.md)**!
