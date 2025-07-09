@@ -446,7 +446,7 @@ def process_tasks_by_type(tasks: List[Task]):
 
 ## Related Classes
 
-- **[Dataset](dataset.md)**: Manages collections of tasks
-- **[Benchmark](benchmark.md)**: Executes tasks and produces results
-- **[PromptTemplate](prompt.md)**: Formats tasks into model prompts
-- **[GeminiModel](model.md)**: Handles multimodal content generation
+- **Dataset**: Manages collections of tasks
+- **Benchmark**: Executes tasks and produces results
+- **PromptTemplate**: Formats tasks into model prompts
+- **GeminiModel**: Handles multimodal content generation

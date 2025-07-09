@@ -1,11 +1,8 @@
-site_name: scirex
-repo_url: https://github.com/n0w0f/scirex
+site_name: SciRex Documentation
+site_description: Scientific Research Benchmarking Framework
 site_url: https://n0w0f.github.io/scirex
-site_description: This is the repository for the project SciResearchBench.
-site_author: Nawaf Alampara
-edit_uri: edit/main/docs/
+repo_url: https://github.com/n0w0f/scirex
 repo_name: n0w0f/scirex
-copyright: Maintained by <a href="https://n0w0f.com">n0w0f</a>.
 
 nav:
   - Home: index.md
@@ -14,30 +11,10 @@ nav:
       - Quick Start: getting-started/quickstart.md
       - First Benchmark: getting-started/first-benchmark.md
   - User Guides:
-      - Text Benchmarks: guides/text-benchmarks.md
-      - Multimodal Benchmarks: guides/multimodal-benchmarks.md
-      - Custom Datasets: guides/custom-datasets.md
-      - Custom Models: guides/custom-models.md
-      - Advanced Usage: guides/advanced-usage.md
+      - Text Benchmarks: guides/text-benchmark.md
+      - Multimodal Benchmarks: guides/multimodal-benchmark.md
   - API Reference:
-      - Dataset: api-reference/dataset.md
-      - Model: api-reference/model.md
-      - Benchmark: api-reference/benchmark.md
       - Task: api-reference/task.md
-      - Prompt: api-reference/prompt.md
-  - Examples:
-      - Chemistry Q&A: examples/chemistry-qa.md
-      - Materials Science: examples/materials-science.md
-      - Biology Images: examples/biology-images.md
-      - Custom Evaluations: examples/custom-evaluations.md
-  - Datasets:
-      - Supported Formats: datasets/supported-formats.md
-      - Creating Datasets: datasets/creating-datasets.md
-      - Data Preprocessing: datasets/data-preprocessing.md
-  - Deployment:
-      - GitHub Actions: deployment/github-actions.md
-      - Docker: deployment/docker.md
-      - Scaling: deployment/scaling.md
 
 theme:
   name: material
@@ -94,7 +71,7 @@ markdown_extensions:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/your-org/scirex
+      link: https://github.com/n0w0f/scirex
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/scirex/
   version:

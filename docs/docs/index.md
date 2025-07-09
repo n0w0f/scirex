@@ -34,7 +34,7 @@ print(f"Accuracy: {benchmark.compute_summary_metrics(results)['success_rate']:.2
 
 ### 🖼️ **Multimodal Support**
 
-- Seamlessly process multimodal content
+- Seamlessly process text + image content
 - Automatic detection of content types
 - Support for molecular diagrams, microscopy images, charts, and graphs
 
@@ -44,6 +44,12 @@ print(f"Accuracy: {benchmark.compute_summary_metrics(results)['success_rate']:.2
 - **Precision/Recall/F1**: For multi-choice questions
 - **MAE**: For numerical predictions
 - **Modality Breakdown**: Separate metrics for text vs multimodal tasks
+
+### 🔄 **Backward Compatible**
+
+- Existing text-only benchmarks work unchanged
+- Gradual migration path to multimodal
+- No breaking changes to existing code
 
 ### 🛠️ **Easy Integration**
 
@@ -83,15 +89,12 @@ print(f"Accuracy: {benchmark.compute_summary_metrics(results)['success_rate']:.2
 
 ### For Practitioners
 
-- **[Text Benchmarks](guides/text-benchmarks.md)**: Traditional Q&A evaluation
-- **[Multimodal Benchmarks](guides/multimodal-benchmarks.md)**: Image + text tasks
-- **[Custom Datasets](guides/custom-datasets.md)**: Create your own evaluation sets
+- **[Text Benchmarks](guides/text-benchmark.md)**: Traditional Q&A evaluation
+- **[Multimodal Benchmarks](guides/multimodal-benchmark.md)**: Image + text tasks
 
 ### For Developers
 
-- **[API Reference](api-reference/dataset.md)**: Complete class and method documentation
-- **[Custom Models](guides/custom-models.md)**: Integrate your own LLMs
-- **[Advanced Usage](guides/advanced-usage.md)**: Power user features
+- **[API Reference](api-reference/task.md)**: Complete class and method documentation
 
 ## 🔧 Installation
 
@@ -213,7 +216,7 @@ If you use SciRex in your research, please cite:
 ```bibtex
 @software{scirex2024,
   title={SciRex: Scientific Research Benchmarking Framework},
-  author={Your Name and Contributors},
+  author={Nawaf Alampara, Paige Bailey},
   year={2024},
   url={https://github.com/n0w0f/scirex},
   version={1.0.0}
