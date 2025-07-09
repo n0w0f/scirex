@@ -141,5 +141,5 @@ cython_debug/
 
 
 temp/
-notebooks
+notebooks/
 scripts
