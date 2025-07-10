@@ -1,0 +1,78 @@
+site_name: SciRex Documentation
+site_description: Scientific Research Benchmarking Framework
+site_url: https://n0w0f.github.io/scirex
+repo_url: https://github.com/n0w0f/scirex
+repo_name: n0w0f/scirex
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+      - First Benchmark: getting-started/first-benchmark.md
+  - User Guides:
+      - Text Benchmarks: guides/text-benchmark.md
+      - Multimodal Benchmarks: guides/multimodal-benchmark.md
+  - API Reference:
+      - Task: api-reference/task.md
+
+theme:
+  name: material
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - mermaid2
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/n0w0f/scirex
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/scirex/
+  version:
+    provider: mike
