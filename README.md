@@ -1,10 +1,10 @@
 # scirex
 
 [![Release](https://img.shields.io/github/v/release/n0w0f/scirex)](https://img.shields.io/github/v/release/n0w0f/scirex)
-[![Build status](https://img.shields.io/github/actions/workflow/status/n0w0f/scirex/main.yml?branch=main)](https://github.com/n0w0f/scirex/actions/workflows/main.yml?query=branch%3Amain)
 [![codecov](https://codecov.io/gh/n0w0f/scirex/branch/main/graph/badge.svg)](https://codecov.io/gh/n0w0f/scirex)
 [![Commit activity](https://img.shields.io/github/commit-activity/m/n0w0f/scirex)](https://img.shields.io/github/commit-activity/m/n0w0f/scirex)
 [![License](https://img.shields.io/github/license/n0w0f/scirex)](https://img.shields.io/github/license/n0w0f/scirex)
+[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://n0w0f.github.io/scirex)
 
 # SciRex: Scientific Research Benchmarking Framework
 
@@ -63,7 +63,7 @@ prompt_template = PromptTemplate()
 benchmark = Benchmark(model, prompt_template)
 
 
-dataset = Dataset("your-org/chemistry-qa-dataset")
+dataset = Dataset("jablonkagroup/ChemBench", "organic_chemistry")
 
 # Run benchmark
 results = benchmark.run_benchmark(dataset, max_tasks=10)
@@ -149,7 +149,7 @@ print(f"Predicted: {result.parsed_answer}, Actual: {task.target}")
 
 ## Documentation
 
-For detailed documentation, examples, and API reference, visit: [https://your-org.github.io/scirex](https://your-org.github.io/scirex)
+For detailed documentation, examples, and API reference, visit: [https://n0w0f.github.io/scirex](https://n0w0f.github.io/scirex)
 
 ## Contributing
 
@@ -168,8 +168,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ```bibtex
 @software{scirex2024,
   title={SciRex: Scientific Research Benchmarking Framework},
-  author={Your Name},
+  author={Nawaf Alampara},
   year={2024},
-  url={https://github.com/your-org/scirex}
+  url={https://github.com/n0w0f/scirex}
 }
 ```
