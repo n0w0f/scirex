@@ -5,7 +5,9 @@ Get up and running with SciRex in 5 minutes.
 ## Basic Text-Only Benchmark
 
 ```python
-from scirex import Dataset, GeminiModel, Benchmark
+from scirex.task import Dataset
+from scirex.model import GeminiModel
+from scirex.benchmark import Benchmark
 
 # Initialize components
 model = GeminiModel("gemini-2.5-flash")
@@ -25,14 +27,16 @@ print(f"Accuracy: {summary['success_rate']:.2%}")
 ## Multimodal Benchmark
 
 ```python
-from scirex import Dataset, GeminiModel, Benchmark
+from scirex.task import Dataset
+from scirex.model import GeminiModel
+from scirex.benchmark import Benchmark
 
 # Initialize with multimodal support
 model = GeminiModel("gemini-2.5-flash")
 benchmark = Benchmark(model, test_multimodal=True)
 
 # Load multimodal dataset
-dataset = Dataset("jablonkagroup/MaCBench", "material_science")
+dataset = Dataset("jablonkagroup/MaCBench", "afm-images")
 
 # Run benchmark - automatically handles multimodal content
 results = benchmark.run_benchmark(dataset, max_tasks=5)

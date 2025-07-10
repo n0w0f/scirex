@@ -10,7 +10,10 @@ Welcome to **SciRex**, a comprehensive Python framework for benchmarking large l
 ## 🚀 Quick Start
 
 ```python
-from scirex import Dataset, GeminiModel, Benchmark
+from scirex.task import Dataset
+from scirex.model import GeminiModel
+from scirex.benchmark import Benchmark
+from scirex.prompt import PromptTemplate
 
 # Load your scientific dataset
 dataset = Dataset("n0w0f/chemistry-dataset")
@@ -130,10 +133,13 @@ print(f"Accuracy: {benchmark.compute_summary_metrics(results)['success_rate']:.2
 ### Text-Only Benchmark
 
 ```python
-from scirex import Dataset, GeminiModel, Benchmark
+from scirex.task import Dataset
+from scirex.model import GeminiModel
+from scirex.benchmark import Benchmark
+from scirex.prompt import PromptTemplate
 
 # Chemistry Q&A evaluation
-dataset = Dataset("chemqa/chemistry-questions")
+dataset = Dataset("n0w0f/scirex-text", "particel_energy_2d")
 model = GeminiModel("gemini-2.5-flash")
 benchmark = Benchmark(model)
 
@@ -146,18 +152,12 @@ print(f"Chemistry Q&A Accuracy: {summary['success_rate']:.2%}")
 
 ```python
 # Materials science with images
-dataset = Dataset("matsci/crystal-structures")
+dataset = Dataset("jablonkagroup/MacBench", "isomers")
 model = GeminiModel("gemini-2.5-flash")  # Vision-enabled model
 benchmark = Benchmark(model, test_multimodal=True)
 
 results = benchmark.run_benchmark(dataset)
 
-# Analyze by content type
-text_acc = sum(r.metrics['accuracy'] for r in results if not r.is_multimodal) / len([r for r in results if not r.is_multimodal])
-image_acc = sum(r.metrics['accuracy'] for r in results if r.is_multimodal) / len([r for r in results if r.is_multimodal])
-
-print(f"Text Accuracy: {text_acc:.2%}")
-print(f"Image Accuracy: {image_acc:.2%}")
 ```
 
 ### Custom Evaluation

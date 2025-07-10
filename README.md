@@ -55,7 +55,10 @@ GOOGLE_API_KEY=your_gemini_api_key_here
 ### Text-Only Benchmark
 
 ```python
-from scirex import Dataset, GeminiModel, Benchmark, PromptTemplate
+from scirex.task import Dataset
+from scirex.model import GeminiModel
+from scirex.benchmark import Benchmark
+from scirex.prompt import PromptTemplate
 
 
 model = GeminiModel("gemini-2.5-flash")
@@ -63,7 +66,7 @@ prompt_template = PromptTemplate()
 benchmark = Benchmark(model, prompt_template)
 
 
-dataset = Dataset("jablonkagroup/ChemBench", "organic_chemistry")
+dataset = Dataset("n0w0f/scirex-text")
 
 # Run benchmark
 results = benchmark.run_benchmark(dataset, max_tasks=10)
@@ -76,17 +79,19 @@ print(f"Overall accuracy: {summary['success_rate']:.2f}")
 ### Multimodal Benchmark
 
 ```python
-from scirex import Dataset, GeminiModel, Benchmark, PromptTemplate
+from scirex.task import Dataset
+from scirex.model import GeminiModel
+from scirex.benchmark import Benchmark
+from scirex.prompt import PromptTemplate
 
 model = GeminiModel("gemini-2.5-flash")  # Ensure model supports vision
 benchmark = Benchmark(model, test_multimodal=True)
 
 # Load multimodal dataset (images + text)
-dataset = Dataset("jablonkagroup/MaCBench", "material_science")
+dataset = Dataset("n0w0f/scirex-image", "particle_energy_2d")
 
 # Run benchmark - automatically detects and handles multimodal content
 results = benchmark.run_benchmark(dataset, max_tasks=5)
-
 
 # Save detailed results
 benchmark.save_results_to_json(results, "benchmark_results.json")
