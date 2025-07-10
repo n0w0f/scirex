@@ -12,7 +12,7 @@ model = GeminiModel("gemini-2.5-flash")
 benchmark = Benchmark(model)
 
 # Load a text-only dataset (replace with your dataset)
-dataset = Dataset("your-org/chemistry-dataset")
+dataset = Dataset("jablonkagroup/ChemBench", "organic_chemistry")
 
 # Run benchmark
 results = benchmark.run_benchmark(dataset, max_tasks=5)
