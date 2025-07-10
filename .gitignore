@@ -143,3 +143,4 @@ cython_debug/
 temp/
 notebooks
 scripts
+.DS_Store
