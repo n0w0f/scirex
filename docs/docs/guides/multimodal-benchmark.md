@@ -14,7 +14,10 @@ Multimodal benchmarks evaluate how well language models can understand and reaso
 ## Quick Start
 
 ```python
-from scirex import Dataset, GeminiModel, Benchmark
+from scirex.task import Dataset
+from scirex.model import GeminiModel
+from scirex.benchmark import Benchmark
+from scirex.prompt import PromptTemplate
 
 # Initialize model with vision capabilities
 model = GeminiModel("gemini-2.5-flash")  # or gemini-2.5-pro

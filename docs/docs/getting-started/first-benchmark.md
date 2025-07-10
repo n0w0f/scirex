@@ -11,7 +11,10 @@ A step-by-step tutorial to run your first scientific benchmark with SciRex.
 ## Step 1: Import SciRex
 
 ```python
-from scirex import Dataset, GeminiModel, Benchmark, PromptTemplate
+from scirex.task import Dataset
+from scirex.model import GeminiModel
+from scirex.benchmark import Benchmark
+from scirex.prompt import PromptTemplate
 ```
 
 ## Step 2: Setup Your Model
@@ -40,7 +43,7 @@ benchmark = Benchmark(
 
 ```python
 # Option A: Load existing dataset
-dataset = Dataset("jablonkagroup/MaCBench", "material_science")
+dataset = Dataset("jablonkagroup/MaCBench", "isomers")
 
 # Option B: Create custom task (example)
 from scirex.task import Task
