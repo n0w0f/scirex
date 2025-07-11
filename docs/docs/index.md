@@ -16,7 +16,7 @@ from scirex.benchmark import Benchmark
 from scirex.prompt import PromptTemplate
 
 # Load your scientific dataset
-dataset = Dataset("n0w0f/chemistry-dataset")
+dataset = Dataset("n0w0f/scirex-image", "particle_energy_2d")
 
 # Initialize model and benchmark
 model = GeminiModel("gemini-2.5-flash")
@@ -29,36 +29,22 @@ print(f"Accuracy: {benchmark.compute_summary_metrics(results)['success_rate']:.2
 
 ## ✨ Key Features
 
-### 🔬 **Scientific Focus**
+- 🔬 **Scientific Focus**: Designed for scientific research tasks
+- 🖼️ **Multimodal Support**:
+  - Handle text + image tasks seamlessly
+- 🚀 **Easy Integration**:
 
-- Built specifically for scientific domains (chemistry, biology, materials science)
-- Handles domain-specific evaluation metrics and data formats
-- Support for molecular structures, experimental data, and research papers
+  - Simple API for custom datasets and models
+  - Support for HuggingFace datasets
+  - Extensible for custom models and metrics
 
-### 🖼️ **Multimodal Support**
+- 🚀 **Custom Prompt templates**:
 
-- Seamlessly process text + image content
-- Automatic detection of content types
-- Support for molecular diagrams, microscopy images, charts, and graphs
+  - Allow custom prompt templates
+  - Prompt Optimization (Incoming)
 
-### 📊 **Comprehensive Metrics**
-
-- **Accuracy**: Exact match scoring
-- **Precision/Recall/F1**: For multi-choice questions
-- **MAE**: For numerical predictions
-- **Modality Breakdown**: Separate metrics for text vs multimodal tasks
-
-### 🔄 **Backward Compatible**
-
-- Existing text-only benchmarks work unchanged
-- Gradual migration path to multimodal
-- No breaking changes to existing code
-
-### 🛠️ **Easy Integration**
-
-- Simple Python API
-- Support for HuggingFace datasets
-- Extensible for custom models and metrics
+- 📊 **Agent for Reward** : (Incoming)
+- 🔄 **CoT Faithfulness** : (Incoming)
 
 ## 🎯 Use Cases
 
