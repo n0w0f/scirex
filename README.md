@@ -66,7 +66,7 @@ prompt_template = PromptTemplate()
 benchmark = Benchmark(model, prompt_template)
 
 
-dataset = Dataset("n0w0f/scirex-text")
+dataset = Dataset("n0w0f/scirex-text", "particle_energy_2d")
 
 # Run benchmark
 results = benchmark.run_benchmark(dataset, max_tasks=10)
