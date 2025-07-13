@@ -46,7 +46,7 @@ pip install git+https://github.com/n0w0f/scirex.git
 
 ### Setup
 
-Create a `.env` file with your API key:
+Create a `.env` file with your API key
 
 ```bash
 GOOGLE_API_KEY=your_gemini_api_key_here
@@ -61,7 +61,7 @@ from scirex.benchmark import Benchmark
 from scirex.prompt import PromptTemplate
 
 
-model = GeminiModel("gemini-2.5-flash")
+model = GeminiModel("gemini-2.5-flash", api_key="GOOGLE_API_KEY")
 prompt_template = PromptTemplate()
 benchmark = Benchmark(model, prompt_template)
 
@@ -84,7 +84,7 @@ from scirex.model import GeminiModel
 from scirex.benchmark import Benchmark
 from scirex.prompt import PromptTemplate
 
-model = GeminiModel("gemini-2.5-flash")  # Ensure model supports vision
+model = GeminiModel("gemini-2.5-flash", api_key="GOOGLE_API_KEY")
 benchmark = Benchmark(model, test_multimodal=True)
 
 # Load multimodal dataset (images + text)

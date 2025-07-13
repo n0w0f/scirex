@@ -10,7 +10,7 @@ from scirex.model import GeminiModel
 from scirex.benchmark import Benchmark
 
 # Initialize components
-model = GeminiModel("gemini-2.5-flash")
+model = GeminiModel("gemini-2.5-flash",api_key="GOOGLE_API_KEY")
 benchmark = Benchmark(model)
 
 # Load a text-only dataset (replace with your dataset)
@@ -32,7 +32,7 @@ from scirex.model import GeminiModel
 from scirex.benchmark import Benchmark
 
 # Initialize with multimodal support
-model = GeminiModel("gemini-2.5-flash")
+model = GeminiModel("gemini-2.5-flash",)
 benchmark = Benchmark(model, test_multimodal=True)
 
 # Load multimodal dataset
