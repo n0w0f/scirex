@@ -1,10 +1,12 @@
 import ast
 import base64
 import json
+import re
 from dataclasses import dataclass
-from typing import Any, Optional, Union
+from typing import Any
 
 from datasets import load_dataset
+from loguru import logger
 
 
 def parse_json_like_string(s: str) -> dict:
@@ -12,12 +14,22 @@ def parse_json_like_string(s: str) -> dict:
     Convert a JSON-like string with single quotes to valid JSON and parse it.
     """
     try:
+        # First try ast.literal_eval for Python literals
         python_dict = ast.literal_eval(s)
         json_string = json.dumps(python_dict)
         return json.loads(json_string)
-    except (SyntaxError, ValueError, json.JSONDecodeError) as e:
-        print(f"Error parsing string: {e}")
-        return None
+    except (SyntaxError, ValueError, json.JSONDecodeError):
+        try:
+            # Try direct JSON parsing
+            return json.loads(s)
+        except json.JSONDecodeError:
+            try:
+                # Try replacing single quotes with double quotes
+                s_fixed = s.replace("'", '"').replace("True", "true").replace("False", "false").replace("None", "null")
+                return json.loads(s_fixed)
+            except json.JSONDecodeError as e:
+                logger.info(f"Error parsing string: {e}")
+                return None
 
 
 @dataclass
@@ -71,15 +83,13 @@ class Task:
         content_parts = []
 
         # Find all placeholders in the template
-        import re
-
         placeholders = re.findall(r"\{(\w+)\}", self.input_template)
 
         # Track which parts need to be replaced with images
         image_placeholders = {}
 
         # Process each modality category
-        for category, entries in self.qentries_modality.items():
+        for _category, entries in self.qentries_modality.items():
             for placeholder, entry_data in entries.items():
                 if placeholder in placeholders:
                     entry_type = entry_data.get("type", "text")
@@ -127,7 +137,7 @@ class Task:
         self.resolved_content = content_parts
         return content_parts
 
-    def _parse_base64_image(self, data_url: str) -> Optional[dict[str, Any]]:
+    def _parse_base64_image(self, data_url: str) -> dict[str, Any] | None:
         """
         Parse base64 encoded image from data URL.
         Expected format: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...'
@@ -147,7 +157,7 @@ class Task:
 
             return {"data": image_bytes, "mime_type": mime_type}
         except Exception as e:
-            print(f"Error parsing base64 image: {e}")
+            logger.info(f"Error parsing base64 image: {e}")
             return None
 
 
@@ -165,28 +175,54 @@ class Dataset:
         tasks = []
 
         for row in dataset:
-            for example in row["examples"]:
-                # Parse example if it's a string
-                if isinstance(example, str):
-                    example = parse_json_like_string(example)
+            # Debug: logger.info the first few examples to understand the format
+            if len(tasks) == 0:
+                logger.info(f"First row keys: {list(row.keys())}")
+                if row["examples"]:
+                    logger.info(f"First example preview: {str(row['examples'][0])[:100]}...")
 
-                # Check if this is a multimodal task
-                is_multimodal = "qentries_modality" in example
+            for example in row["examples"]:
+                original_example = example
+
+                # Handle different example formats
+                if isinstance(example, str):
+                    # Parse string examples (some datasets have this format)
+                    example = parse_json_like_string(example)
+                    if example is None:
+                        logger.info(f"Skipping failed parse for row {row.get('uuid', 'unknown')}")
+                        continue
+                elif isinstance(example, dict):
+                    pass
+                else:
+                    # Skip if example is not a string or dict
+                    logger.info(f"Skipping unknown example type: {type(example)} - {str(original_example)[:100]}...")
+                    continue
+
+                # Now example should be a valid dictionary
+                # Detect if this is a multimodal task
+                is_multimodal = (
+                    isinstance(example, dict)
+                    and "qentries_modality" in example
+                    and example["qentries_modality"] is not None
+                )
 
                 if is_multimodal:
-                    # Handle multimodal task
-                    task = self._create_multimodal_task(row, example)
+                    # Handle multimodal format
+                    multimodal_tasks = self._parse_multimodal_task(example, row)
+                    tasks.extend(multimodal_tasks)
                 else:
-                    # Handle traditional text-only task
-                    task = self._create_text_task(row, example)
+                    # Handle original text-only format
+                    task = self._parse_text_task(example, row)
+                    if task:
+                        tasks.append(task)
 
-                if task:
-                    tasks.append(task)
-
+        logger.info(f"Loaded {len(tasks)} tasks successfully")
         return tasks
 
-    def _create_multimodal_task(self, row: dict, example: dict) -> Optional[Task]:
-        """Create a multimodal task from the new format."""
+    def _parse_multimodal_task(self, example: dict, row: dict) -> list[Task]:
+        """Parse a multimodal task from the new format."""
+        tasks = []
+
         try:
             # Extract basic info
             input_template = example["input"]
@@ -197,24 +233,32 @@ class Dataset:
             if example.get("target") is not None:
                 target = example["target"]
                 if isinstance(target, str):
-                    target = float(target)
+                    try:
+                        target = float(target)
+                    except ValueError:
+                        logger.info(f"Failed to parse numeric target: {target}")
+                        return []
                 answer_type = "numeric"
             elif example.get("target_scores") is not None:
                 target_scores = example["target_scores"]
                 if isinstance(target_scores, str):
-                    target_scores = json.loads(target_scores)
+                    try:
+                        target_scores = json.loads(target_scores)
+                    except json.JSONDecodeError:
+                        logger.info(f"Failed to parse target_scores: {target_scores}")
+                        return []
                 target = target_scores
                 answer_type = "mcq"
             else:
-                print(f"No target found for multimodal task {row['uuid']}")
-                return None
+                logger.info(f"No target found for multimodal task {row['uuid']}")
+                return []
 
             # Create task object
             task = Task(
                 uuid=row["uuid"],
                 name=row["name"],
                 description=row["description"],
-                question=input_template,  # Store template as question for now
+                question="",  # Will be filled below
                 answer_type=answer_type,
                 target=target,
                 keywords=row["keywords"],
@@ -225,19 +269,17 @@ class Dataset:
             )
 
             # Resolve the template to create the final question text
-            content_parts = task.resolve_multimodal_content()
-            # For now, create a text representation (images will be handled separately in model)
-            text_parts = [part for part in content_parts if isinstance(part, str)]
-            task.question = " ".join(text_parts) if text_parts else input_template
+            task.question = task.get_text_content()
 
-            return task
+            tasks.append(task)
 
         except Exception as e:
-            print(f"Error creating multimodal task {row['uuid']}: {e}")
-            return None
+            logger.info(f"Error creating multimodal task {row['uuid']}: {e}")
 
-    def _create_text_task(self, row: dict, example: dict) -> Optional[Task]:
-        """Create a traditional text-only task (backward compatibility)."""
+        return tasks
+
+    def _parse_text_task(self, example: dict, row: dict) -> Task | None:
+        """Parse a traditional text-only task (backward compatibility)."""
         try:
             # Clean up example data (following original logic)
             cleaned_example = {"input": example["input"]}
@@ -249,7 +291,7 @@ class Dataset:
                     try:
                         target = float(target)
                     except ValueError:
-                        print(f"Failed to parse numeric target: {target}")
+                        logger.info(f"Failed to parse numeric target: {target}")
                         return None
                 cleaned_example["target"] = target
                 answer_type = "numeric"
@@ -260,16 +302,16 @@ class Dataset:
                     try:
                         target_scores = json.loads(target_scores)
                     except json.JSONDecodeError:
-                        print(f"Failed to parse target_scores: {target_scores}")
+                        logger.info(f"Failed to parse target_scores: {target_scores}")
                         return None
                 cleaned_example["target_scores"] = target_scores
                 answer_type = "mcq"
                 target = target_scores
             else:
-                print(f"No target found for text task {row['uuid']}")
+                logger.info(f"No target found for text task {row['uuid']}")
                 return None
 
-            task = Task(
+            return Task(
                 uuid=row["uuid"],
                 name=row["name"],
                 description=row["description"],
@@ -279,10 +321,9 @@ class Dataset:
                 keywords=row["keywords"],
                 is_multimodal=False,
             )
-            return task
 
         except Exception as e:
-            print(f"Error creating text task {row['uuid']}: {e}")
+            logger.info(f"Error creating text task {row['uuid']}: {e}")
             return None
 
     def get_tasks_by_type(self, answer_type: str) -> list[Task]:

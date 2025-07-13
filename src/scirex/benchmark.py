@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from datasets import Dataset
+from loguru import logger
 
 from scirex.model import GeminiModel
 from scirex.prompt import PromptTemplate
@@ -146,14 +147,16 @@ class Benchmark:
         self.multimodal_supported = False
         if test_multimodal:
             self.multimodal_supported = self.model.test_multimodal_capability()
-            print(f"Multimodal support: {'✓' if self.multimodal_supported else '✗'}")
+            logger.info(f"Multimodal support: {'✓' if self.multimodal_supported else '✗'}")
 
     def run_single_task(self, task: Task) -> BenchmarkResult:
         """Run benchmark on a single task with multimodal support."""
         try:
             # Check if task is multimodal but model doesn't support it
             if task.is_multimodal and not self.multimodal_supported:
-                print(f"Warning: Task {task.uuid} is multimodal but model doesn't support it. Using text-only version.")
+                logger.info(
+                    f"Warning: Task {task.uuid} is multimodal but model doesn't support it. Using text-only version."
+                )
                 task_content = task.get_text_content()
                 prompt = self._format_text_prompt(task, task_content)
                 content_type = "text_fallback"
@@ -183,7 +186,7 @@ class Benchmark:
             success = True
 
         except Exception as e:
-            print(f"Error processing task {task.uuid}: {e}")
+            logger.info(f"Error processing task {task.uuid}: {e}")
             response = ""
             parsed_answer = None
             metrics = {"accuracy": 0.0}
@@ -233,19 +236,19 @@ class Benchmark:
         tasks = dataset.tasks[:max_tasks] if max_tasks else dataset.tasks
         results = []
 
-        # Print dataset statistics
+        # logger.info dataset statistics
         total_tasks = len(tasks)
         multimodal_tasks = len([t for t in tasks if t.is_multimodal])
         text_tasks = total_tasks - multimodal_tasks
 
-        print(f"Dataset statistics:")
-        print(f"  Total tasks: {total_tasks}")
-        print(f"  Text-only tasks: {text_tasks}")
-        print(f"  Multimodal tasks: {multimodal_tasks}")
+        logger.info(f"Dataset statistics:")
+        logger.info(f"  Total tasks: {total_tasks}")
+        logger.info(f"  Text-only tasks: {text_tasks}")
+        logger.info(f"  Multimodal tasks: {multimodal_tasks}")
 
         for i, task in enumerate(tasks):
             task_type = "multimodal" if task.is_multimodal else "text"
-            print(f"Processing task {i + 1}/{len(tasks)} ({task_type}): {task.name}")
+            logger.info(f"Processing task {i + 1}/{len(tasks)} ({task_type}): {task.name}")
             result = self.run_single_task(task)
             results.append(result)
 
@@ -369,9 +372,9 @@ class Benchmark:
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(output_data, f, indent=2, ensure_ascii=False)
 
-        print(f"Results saved to {output_path}")
-        print(f"Total tokens used: {total_tokens:,}")
-        print(f"Estimated cost: ${total_cost_estimate:.4f}")
+        logger.info(f"Results saved to {output_path}")
+        logger.info(f"Total tokens used: {total_tokens:,}")
+        logger.info(f"Estimated cost: ${total_cost_estimate:.4f}")
 
     def _compute_token_stats(self, results: list[BenchmarkResult]) -> dict[str, Any]:
         """Compute token usage statistics with multimodal breakdown."""

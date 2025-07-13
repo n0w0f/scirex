@@ -154,7 +154,7 @@ print(f"Predicted: {result.parsed_answer}, Actual: {task.target}")
 
 ## Documentation
 
-For detailed documentation, examples, and API reference, visit: [https://n0w0f.github.io/scirex](https://n0w0f.github.io/scirex)
+For detailed documentation, examples, and API reference, visit: [docs](https://n0w0f.github.io/scirex)
 
 ## Contributing
 
