@@ -19,21 +19,20 @@ nav:
 theme:
   name: material
   palette:
-    # Palette toggle for light mode
-    - scheme: default
+    # 1. Palette toggle for dark mode (Default)
+    - scheme: slate
       primary: blue
       accent: light blue
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
-    - scheme: secondary
+    # 2. Palette toggle for light mode
+    - scheme: default
       primary: blue
       accent: light blue
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
-    # Palette toggle for dark mode
-
   features:
     - navigation.tabs
     - navigation.sections
