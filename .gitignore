@@ -144,3 +144,5 @@ temp/
 notebooks/
 scripts
 .DS_Store
+reports
+reports_macbench

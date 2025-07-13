@@ -27,6 +27,7 @@ dependencies = [
     "mkdocs-mermaid2-plugin>=1.2.1",
     "pillow>=11.3.0",
     "python-dotenv>=1.1.0",
+    "scipy>=1.13.1",
 ]
 
 [project.urls]

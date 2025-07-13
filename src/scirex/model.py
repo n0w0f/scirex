@@ -8,18 +8,23 @@ from google.genai import types
 
 from scirex.response import GeminiResponse
 
-# Load environment variables from .env file
-load_dotenv("../../.env")
+load_dotenv()
 
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-if not GOOGLE_API_KEY:
-    raise ValueError("API Key not set.")
+
+class APIKeyError(ValueError):
+    def __init__(self):
+        super().__init__("Google API key must be provided or set in the environment as GOOGLE_API_KEY.")
 
 
 class GeminiModel:
     """Wrapper for Gemini API with multimodal support."""
 
-    def __init__(self, model_name: str = "gemini-2.5-pro-preview-06-05", delay: int = 2, **config):
+    def __init__(
+        self, model_name: str = "gemini-2.5-pro-preview-06-05", api_key: str | None = None, delay: int = 2, **config
+    ):
+        self.api_key = api_key or os.getenv("GOOGLE_API_KEY")
+        if not self.api_key:
+            raise APIKeyError()
         self.client = genai.Client()
         self.model_name = model_name
         self.config = types.GenerateContentConfig(**config)
