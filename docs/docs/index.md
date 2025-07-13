@@ -5,7 +5,7 @@
 [![Commit activity](https://img.shields.io/github/commit-activity/m/n0w0f/scirex)](https://img.shields.io/github/commit-activity/m/n0w0f/scirex)
 [![License](https://img.shields.io/github/license/n0w0f/scirex)](https://img.shields.io/github/license/n0w0f/scirex)
 
-Welcome to **SciRex**, a comprehensive Python framework for benchmarking large language models on scientific research tasks. Whether you're working with text-only questions or complex multimodal content involving images and text, SciRex provides the tools you need for rigorous evaluation.
+Welcome to **SciRex**, a comprehensive Python framework for benchmarking large language models on scientific research tasks.
 
 ## 🚀 Quick Start
 
@@ -19,7 +19,7 @@ from scirex.prompt import PromptTemplate
 dataset = Dataset("n0w0f/scirex-image", "particle_energy_2d")
 
 # Initialize model and benchmark
-model = GeminiModel("gemini-2.5-flash")
+model = GeminiModel("gemini-2.5-flash", api_key="GOOGLE_API_KEY")
 benchmark = Benchmark(model)
 
 # Run evaluation
@@ -30,8 +30,7 @@ print(f"Accuracy: {benchmark.compute_summary_metrics(results)['success_rate']:.2
 ## ✨ Key Features
 
 - 🔬 **Scientific Focus**: Designed for scientific research tasks
-- 🖼️ **Multimodal Support**:
-  - Handle text + image tasks seamlessly
+- 🖼️ **Multimodal Support**: Handle multimodality tasks seamlessly
 - 🚀 **Easy Integration**:
 
   - Simple API for custom datasets and models
@@ -46,7 +45,7 @@ print(f"Accuracy: {benchmark.compute_summary_metrics(results)['success_rate']:.2
 - 📊 **Agent for Reward** : (Incoming)
 - 🔄 **CoT Faithfulness** : (Incoming)
 
-## 🎯 Use Cases
+## 🎯 Use Cases (example tasks)
 
 !!! example "Research Applications"
 
@@ -78,8 +77,8 @@ print(f"Accuracy: {benchmark.compute_summary_metrics(results)['success_rate']:.2
 
 ### For Practitioners
 
-- **[Text Benchmarks](guides/text-benchmark.md)**: Traditional Q&A evaluation
-- **[Multimodal Benchmarks](guides/multimodal-benchmark.md)**: Image + text tasks
+- **[Build Multimodal Benchmarks](guides/multimodal-benchmark.md)**
+- **[Prompt Optmization](https://alampara.com/scirex/guides/multimodal-benchmark/#prompt-optimization)**
 
 ### For Developers
 
@@ -125,8 +124,8 @@ from scirex.benchmark import Benchmark
 from scirex.prompt import PromptTemplate
 
 # Chemistry Q&A evaluation
-dataset = Dataset("n0w0f/scirex-text", "particel_energy_2d")
-model = GeminiModel("gemini-2.5-flash")
+dataset = Dataset("jablonkagroup/ChemBench", "analytical_chemistry")
+model = GeminiModel("gemini-2.5-flash", api_key="GOOGLE_API_KEY")
 benchmark = Benchmark(model)
 
 results = benchmark.run_benchmark(dataset)
@@ -138,8 +137,8 @@ print(f"Chemistry Q&A Accuracy: {summary['success_rate']:.2%}")
 
 ```python
 # Materials science with images
-dataset = Dataset("jablonkagroup/MacBench", "isomers")
-model = GeminiModel("gemini-2.5-flash")  # Vision-enabled model
+dataset = Dataset("n0w0f/scirex-image", "particle_energy_3d")
+model = GeminiModel("gemini-2.5-flash", api_key="GOOGLE_API_KEY") # Vision-enabled model
 benchmark = Benchmark(model, test_multimodal=True)
 
 results = benchmark.run_benchmark(dataset)
@@ -173,7 +172,7 @@ result = benchmark.run_single_task(task)
 print(f"Predicted: {result.parsed_answer} rings, Actual: {task.target} rings")
 ```
 
-## 📈 Performance Insights
+## 📈 Flow of data
 
 ```mermaid
 graph TD

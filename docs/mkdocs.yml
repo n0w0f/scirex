@@ -24,15 +24,16 @@ theme:
       primary: blue
       accent: light blue
       toggle:
-        icon: material/brightness-7
-        name: Switch to dark mode
-    # Palette toggle for dark mode
-    - scheme: slate
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: secondary
       primary: blue
       accent: light blue
       toggle:
-        icon: material/brightness-4
-        name: Switch to light mode
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+
   features:
     - navigation.tabs
     - navigation.sections

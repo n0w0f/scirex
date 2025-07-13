@@ -23,6 +23,7 @@ from scirex.prompt import PromptTemplate
 # Initialize Gemini model
 model = GeminiModel(
     model_name="gemini-2.5-flash",  # Fast model for testing
+    api_key="GOOGLE_API_KEY",
     delay=1  # Reduce delay for faster development
 )
 ```
