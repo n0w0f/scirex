@@ -4,6 +4,8 @@ import json
 import os
 from io import BytesIO
 from typing import Any, Dict, List
+from datasets import Dataset, DatasetDict, Features, Value, Sequence
+import datasets
 
 from datasets import Dataset, DatasetDict, Features, Value
 from datasets import Image as HFImage
@@ -40,13 +42,23 @@ class GeneralHuggingFaceUploader:
 
     def prepare_dataset(self, json_file: str, multimodal: bool) -> Dataset:
         """
-        Prepare a dataset for HuggingFace from a JSON file using the new schema.
+        Prepare a dataset for HuggingFace from a JSON file, ensuring all metadata
+        is included in every row.
         """
         with open(json_file, "r") as f:
             data = json.load(f)
 
-        # Define the features based on the new schema
+        # Define the full, correct features for the dataset
         feature_dict = {
+            # Add metadata columns
+            "row_uuid": Value("string"),
+            "dataset_uuid": Value("string"),
+            "dataset_name": Value("string"),
+            "dataset_description": Value("string"),
+            "keywords": datasets.Sequence(Value("string")),
+            "preferred_score": Value("string"),
+            "metrics": datasets.Sequence(Value("string")),
+            # Add example-specific columns
             "question_template": Value("string"),
             "question_template_input": Value("string"),  # Store the dict as a JSON string
             "answer": Value("string"),
@@ -58,13 +70,24 @@ class GeneralHuggingFaceUploader:
         features = Features(feature_dict)
 
         rows = []
-        for example in data["examples"]:
+        # Loop through examples and add ALL required data to each row
+        for i, example in enumerate(data["examples"]):
             row = {
+                # Populate metadata columns for this row
+                "row_uuid": f"{data['uuid']}-{i}",
+                "dataset_uuid": data.get("uuid", ""),
+                "dataset_name": data.get("name", ""),
+                "dataset_description": data.get("description", ""),
+                "keywords": data.get("keywords", []),
+                "preferred_score": data.get("preferred_score", ""),
+                "metrics": data.get("metrics", []),
+                # Populate example-specific columns
                 "question_template": example["question_template"],
                 "question_template_input": json.dumps(example["question_template_input"]),
                 "answer": example["answer"],
                 "compute_function": example["compute_function"],
             }
+
             if multimodal:
                 # Handle the new 'q_entries' structure
                 image_base64 = example["q_entries"]["entry1"]["value"]
@@ -201,15 +224,19 @@ def main():
     # 3. Process and upload Text-Only Datasets
     if text_configs:
         print(f"\n{'=' * 20} Processing TEXT-ONLY Datasets {'=' * 20}")
-        # for config_name, data in text_configs.items():
-        #     print(f"\n--- Preparing '{config_name}' ---")
-        #     dataset = uploader.prepare_dataset(data["path"], multimodal=False)
-        #     uploader.upload_config(dataset, TEXT_REPO, config_name, private=PRIVATE)
-        # # Update README once for all new text configs
-        # uploader.update_repo_readme(TEXT_REPO, {k: v["info"] for k, v in text_configs.items()})
+        import time
+
+        time.sleep(1)  # Small delay to avoid rate limiting issues
+        for config_name, data in text_configs.items():
+            print(f"\n--- Preparing '{config_name}' ---")
+            dataset = uploader.prepare_dataset(data["path"], multimodal=False)
+            uploader.upload_config(dataset, TEXT_REPO, config_name, private=PRIVATE)
+        # Update README once for all new text configs
+        uploader.update_repo_readme(TEXT_REPO, {k: v["info"] for k, v in text_configs.items()})
 
     # 4. Process and upload Multimodal Datasets
     if multimodal_configs:
+        time.sleep(1)
         print(f"\n{'=' * 20} Processing MULTIMODAL Datasets {'=' * 20}")
         for config_name, data in multimodal_configs.items():
             print(f"\n--- Preparing '{config_name}' ---")
