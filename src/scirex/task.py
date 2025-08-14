@@ -3,8 +3,10 @@ import base64
 import json
 import re
 from dataclasses import dataclass
-from typing import Any
+from io import BytesIO
+from typing import Any, Union
 
+import PIL.Image
 from datasets import load_dataset
 from loguru import logger
 
@@ -32,63 +34,161 @@ def parse_json_like_string(s: str) -> dict:
                 return None
 
 
+def pil_image_to_base64(image: PIL.Image.Image, format: str = "PNG") -> str:
+    """Convert PIL Image to base64 string."""
+    buffer = BytesIO()
+    image.save(buffer, format=format)
+    buffer.seek(0)
+    image_bytes = buffer.getvalue()
+    base64_string = base64.b64encode(image_bytes).decode("utf-8")
+    return f"data:image/{format.lower()};base64,{base64_string}"
+
+
 @dataclass
 class Task:
-    """Simple task representation with multimodal support."""
+    """Enhanced task representation with template and multimodal support."""
 
     uuid: str
     name: str
     description: str
-    question: str  # For backward compatibility and resolved multimodal content
-    answer_type: str  # "mcq" or "numeric"
-    target: float | dict[str, float]  # target value or target_scores for MCQ
+    question: str  # For backward compatibility and resolved content
+    answer_type: str  # "mcq", "numeric", or "exact_str_match"
+    target: Union[float, dict[str, float], str]  # target value, target_scores for MCQ, or exact answer string
     keywords: list[str]
 
-    # New multimodal fields
+    # Original multimodal fields (for backward compatibility)
     is_multimodal: bool = False
-    input_template: str | None = None  # Template like "{type1} {entry1} is an image..."
-    qentries_modality: dict[str, Any] | None = None  # Modality entries
-    selected_entries: list[str] | None = None  # Which entries are used
-    resolved_content: list[Any] | None = None  # Resolved content for API calls
+    input_template: str | None = None
+    qentries_modality: dict[str, Any] | None = None
+    selected_entries: list[str] | None = None
+    resolved_content: list[Any] | None = None
+
+    # New template-based fields
+    question_template: str | None = None
+    template_input: dict[str, Any] | None = None
+    image_data: str | None = None  # Base64 encoded image data
+    preferred_score: str | None = None
 
     def get_text_content(self) -> str:
         """Get the text-only version of the content for parsing."""
         if not self.is_multimodal:
             return self.question
 
-        content_parts = self.resolve_multimodal_content()
-        # Extract only text parts
-        text_parts = []
-        for part in content_parts:
-            if isinstance(part, str):
-                text_parts.append(part)
-            elif isinstance(part, dict) and part.get("type") == "image":
-                text_parts.append("[IMAGE]")  # Placeholder for image in text
+        if self.question_template and self.template_input:
+            # New template-based format
+            return self._resolve_template_text()
+        else:
+            # Original format
+            content_parts = self.resolve_multimodal_content()
+            text_parts = []
+            for part in content_parts:
+                if isinstance(part, str):
+                    text_parts.append(part)
+                elif isinstance(part, dict) and part.get("type") == "image":
+                    text_parts.append("[IMAGE]")
 
-        return " ".join(text_parts)
+            return " ".join(text_parts)
+
+    def _resolve_template_text(self) -> str:
+        """Resolve template placeholders with text-only content."""
+        if not self.question_template or not self.template_input:
+            return self.question
+
+        resolved_text = self.question_template
+
+        # Replace placeholders
+        for key, value in self.template_input.items():
+            placeholder = f"{{{{{key}}}}}"
+            if key == "entry1" and self.image_data:
+                # Replace image placeholder with text description
+                resolved_text = resolved_text.replace(placeholder, "[IMAGE]")
+            else:
+                resolved_text = resolved_text.replace(placeholder, str(value))
+
+        return resolved_text
 
     def resolve_multimodal_content(self) -> list[Any]:
         """
         Resolve template placeholders with actual content.
-        Returns list of content parts suitable for Gemini API.
+        Returns list of content parts suitable for API calls.
         """
-        if not self.is_multimodal or not self.input_template or not self.qentries_modality:
+        if not self.is_multimodal:
             return [self.question]
 
         if self.resolved_content is not None:
             return self.resolved_content
 
-        # Start with the template
+        # Handle new template-based format
+        if self.question_template and self.template_input:
+            return self._resolve_template_multimodal()
+
+        # Handle original format
+        elif self.input_template and self.qentries_modality:
+            return self._resolve_legacy_multimodal()
+
+        return [self.question]
+
+    def _resolve_template_multimodal(self) -> list[Any]:
+        """Resolve new template-based multimodal content."""
+        if not self.question_template or not self.template_input:
+            return [self.question]
+
+        content_parts = []
+        template = self.question_template
+
+        # Find all placeholders
+        placeholders = re.findall(r"\{\{(\w+)\}\}", template)
+
+        # Track processed placeholders to avoid double processing
+        processed = set()
+        current_template = template
+
+        for placeholder in placeholders:
+            if placeholder in processed:
+                continue
+
+            placeholder_pattern = f"{{{{{placeholder}}}}}"
+
+            if placeholder == "entry1" and self.image_data:
+                # Split at image placeholder
+                parts = current_template.split(placeholder_pattern, 1)
+                if len(parts) == 2:
+                    before, after = parts
+
+                    # Add text before image
+                    if before.strip():
+                        content_parts.append(before.strip())
+
+                    # Add image
+                    content_parts.append({"type": "image", "data": self.image_data})
+
+                    current_template = after
+                    processed.add(placeholder)
+            elif placeholder in self.template_input:
+                # Replace text placeholder
+                value = str(self.template_input[placeholder])
+                current_template = current_template.replace(placeholder_pattern, value)
+                processed.add(placeholder)
+
+        # Add remaining text
+        if current_template.strip():
+            content_parts.append(current_template.strip())
+
+        # If no multimodal content was found, return as text
+        if not any(isinstance(part, dict) for part in content_parts):
+            return [" ".join(str(part) for part in content_parts)]
+
+        self.resolved_content = content_parts
+        return content_parts
+
+    def _resolve_legacy_multimodal(self) -> list[Any]:
+        """Resolve original multimodal format (for backward compatibility)."""
+        # This is the existing logic from the original code
         resolved_text = self.input_template
         content_parts = []
-
-        # Find all placeholders in the template
         placeholders = re.findall(r"\{(\w+)\}", self.input_template)
-
-        # Track which parts need to be replaced with images
         image_placeholders = {}
 
-        # Process each modality category
         for _category, entries in self.qentries_modality.items():
             for placeholder, entry_data in entries.items():
                 if placeholder in placeholders:
@@ -96,140 +196,182 @@ class Task:
                     entry_value = entry_data.get("value", "")
 
                     if entry_type == "text":
-                        # Replace text placeholders directly
                         resolved_text = resolved_text.replace(f"{{{placeholder}}}", entry_value)
                     elif entry_type == "image":
-                        # Mark image placeholders for special handling
                         image_placeholders[placeholder] = entry_value
-                        # For now, replace with a marker
                         resolved_text = resolved_text.replace(f"{{{placeholder}}}", f"[IMAGE_{placeholder}]")
 
-        # If we have images, we need to create a mixed content list
         if image_placeholders:
-            # Split text by image markers and create content parts
             parts = []
             current_text = resolved_text
 
             for placeholder, base64_data in image_placeholders.items():
                 marker = f"[IMAGE_{placeholder}]"
                 if marker in current_text:
-                    # Split at the marker
                     before, after = current_text.split(marker, 1)
-
-                    # Add text before image (if any)
                     if before.strip():
                         parts.append(before.strip())
-
-                    # Add image part
                     parts.append({"type": "image", "data": base64_data})
-
                     current_text = after
 
-            # Add remaining text (if any)
             if current_text.strip():
                 parts.append(current_text.strip())
-
             content_parts = parts
         else:
-            # No images, just return the resolved text
             content_parts = [resolved_text]
 
         self.resolved_content = content_parts
         return content_parts
 
-    def _parse_base64_image(self, data_url: str) -> dict[str, Any] | None:
-        """
-        Parse base64 encoded image from data URL.
-        Expected format: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...'
-        """
-        try:
-            if not data_url.startswith("data:"):
-                return None
-
-            # Split the data URL
-            header, data = data_url.split(",", 1)
-
-            # Extract MIME type
-            mime_type = header.split(";")[0].split(":")[1]
-
-            # Decode base64 data
-            image_bytes = base64.b64decode(data)
-
-            return {"data": image_bytes, "mime_type": mime_type}
-        except Exception as e:
-            logger.info(f"Error parsing base64 image: {e}")
-            return None
-
 
 class Dataset:
-    """Loads and manages benchmark tasks with multimodal support."""
+    """Loads and manages benchmark tasks with enhanced multimodal support."""
 
     def __init__(self, dataset_name: str, subset: str | None = None):
         self.dataset_name = dataset_name
         self.subset = subset
         self.tasks = self._load_tasks()
 
+    def _detect_schema_format(self, row: dict) -> str:
+        """Detect which schema format the dataset uses."""
+        if "examples" in row:
+            return "legacy"  # Original format with examples array
+        elif "question_template" in row and "answer" in row:
+            return "template"  # New template-based format
+        else:
+            return "unknown"
+
     def _load_tasks(self) -> list[Task]:
-        """Load tasks from HuggingFace dataset with multimodal support."""
+        """Load tasks from HuggingFace dataset with enhanced multimodal support."""
         dataset = load_dataset(self.dataset_name, self.subset)["train"]
         tasks = []
 
         for row in dataset:
-            # Debug: logger.info the first few examples to understand the format
+            # Detect schema format
+            schema_format = self._detect_schema_format(row)
+
             if len(tasks) == 0:
+                logger.info(f"Detected schema format: {schema_format}")
                 logger.info(f"First row keys: {list(row.keys())}")
-                if row["examples"]:
-                    logger.info(f"First example preview: {str(row['examples'][0])[:100]}...")
 
-            for example in row["examples"]:
-                original_example = example
-
-                # Handle different example formats
-                if isinstance(example, str):
-                    # Parse string examples (some datasets have this format)
-                    example = parse_json_like_string(example)
-                    if example is None:
-                        logger.info(f"Skipping failed parse for row {row.get('uuid', 'unknown')}")
-                        continue
-                elif isinstance(example, dict):
-                    pass
-                else:
-                    # Skip if example is not a string or dict
-                    logger.info(f"Skipping unknown example type: {type(example)} - {str(original_example)[:100]}...")
-                    continue
-
-                # Now example should be a valid dictionary
-                # Detect if this is a multimodal task
-                is_multimodal = (
-                    isinstance(example, dict)
-                    and "qentries_modality" in example
-                    and example["qentries_modality"] is not None
-                )
-
-                if is_multimodal:
-                    # Handle multimodal format
-                    multimodal_tasks = self._parse_multimodal_task(example, row)
-                    tasks.extend(multimodal_tasks)
-                else:
-                    # Handle original text-only format
-                    task = self._parse_text_task(example, row)
-                    if task:
-                        tasks.append(task)
+            if schema_format == "legacy":
+                # Handle original format
+                tasks.extend(self._parse_legacy_format(row))
+            elif schema_format == "template":
+                # Handle new template-based format
+                task = self._parse_template_format(row)
+                if task:
+                    tasks.append(task)
+            else:
+                logger.warning(f"Unknown schema format for row {row.get('uuid', 'unknown')}")
 
         logger.info(f"Loaded {len(tasks)} tasks successfully")
         return tasks
 
-    def _parse_multimodal_task(self, example: dict, row: dict) -> list[Task]:
-        """Parse a multimodal task from the new format."""
+    def _parse_legacy_format(self, row: dict) -> list[Task]:
+        """Parse original format with examples array."""
         tasks = []
 
+        for example in row["examples"]:
+            if isinstance(example, str):
+                example = parse_json_like_string(example)
+                if example is None:
+                    continue
+
+            # Detect if multimodal
+            is_multimodal = (
+                isinstance(example, dict)
+                and "qentries_modality" in example
+                and example["qentries_modality"] is not None
+            )
+
+            if is_multimodal:
+                multimodal_tasks = self._parse_multimodal_task(example, row)
+                tasks.extend(multimodal_tasks)
+            else:
+                task = self._parse_text_task(example, row)
+                if task:
+                    tasks.append(task)
+
+        return tasks
+
+    def _parse_template_format(self, row: dict) -> Task | None:
+        """Parse new template-based format."""
         try:
-            # Extract basic info
+            # Parse template input
+            template_input = {}
+            if row.get("question_template_input"):
+                template_input = parse_json_like_string(row["question_template_input"])
+                if template_input is None:
+                    logger.warning(f"Failed to parse template_input for {row.get('row_uuid', 'unknown')}")
+                    return None
+
+            # Determine answer type based on preferred_score
+            preferred_score = row.get("preferred_score", "")
+            if preferred_score == "exact_str_match":
+                answer_type = "exact_str_match"
+                target = row["answer"]
+            else:
+                # Try to determine if it's numeric or MCQ based on the answer
+                answer = row["answer"]
+                try:
+                    target = float(answer)
+                    answer_type = "numeric"
+                except (ValueError, TypeError):
+                    # Assume it's exact string match for non-numeric answers
+                    answer_type = "exact_str_match"
+                    target = str(answer)
+
+            # Handle image data
+            image_data = None
+            is_multimodal = False
+            if "image" in row and row["image"] is not None:
+                is_multimodal = True
+                # Convert PIL image to base64
+                if hasattr(row["image"], "save"):  # Check if it's a PIL Image
+                    image_data = pil_image_to_base64(row["image"])
+
+            # Resolve question text
+            question_text = row.get("question_template", "")
+            if template_input:
+                # Create a temporary resolved version for backward compatibility
+                temp_question = question_text
+                for key, value in template_input.items():
+                    placeholder = f"{{{{{key}}}}}"
+                    if key == "entry1" and image_data:
+                        temp_question = temp_question.replace(placeholder, "[IMAGE]")
+                    else:
+                        temp_question = temp_question.replace(placeholder, str(value))
+                question_text = temp_question
+
+            return Task(
+                uuid=row.get("row_uuid", ""),
+                name=row.get("dataset_name", ""),
+                description=row.get("dataset_description", ""),
+                question=question_text,
+                answer_type=answer_type,
+                target=target,
+                keywords=row.get("keywords", []),
+                is_multimodal=is_multimodal,
+                question_template=row.get("question_template"),
+                template_input=template_input,
+                image_data=image_data,
+                preferred_score=preferred_score,
+            )
+
+        except Exception as e:
+            logger.error(f"Error creating template-based task {row.get('row_uuid', 'unknown')}: {e}")
+            return None
+
+    def _parse_multimodal_task(self, example: dict, row: dict) -> list[Task]:
+        """Parse multimodal task from original format (for backward compatibility)."""
+        # This is the existing logic from the original code
+        tasks = []
+        try:
             input_template = example["input"]
             qentries_modality = example["qentries_modality"]
             selected_entries = example.get("selected_entries", [])
 
-            # Determine answer type and target
             if example.get("target") is not None:
                 target = example["target"]
                 if isinstance(target, str):
@@ -253,12 +395,11 @@ class Dataset:
                 logger.info(f"No target found for multimodal task {row['uuid']}")
                 return []
 
-            # Create task object
             task = Task(
                 uuid=row["uuid"],
                 name=row["name"],
                 description=row["description"],
-                question="",  # Will be filled below
+                question="",
                 answer_type=answer_type,
                 target=target,
                 keywords=row["keywords"],
@@ -268,9 +409,7 @@ class Dataset:
                 selected_entries=selected_entries,
             )
 
-            # Resolve the template to create the final question text
             task.question = task.get_text_content()
-
             tasks.append(task)
 
         except Exception as e:
@@ -279,12 +418,10 @@ class Dataset:
         return tasks
 
     def _parse_text_task(self, example: dict, row: dict) -> Task | None:
-        """Parse a traditional text-only task (backward compatibility)."""
+        """Parse traditional text-only task (backward compatibility)."""
         try:
-            # Clean up example data (following original logic)
             cleaned_example = {"input": example["input"]}
 
-            # Handle target_scores and target with proper JSON parsing
             if example.get("target") is not None:
                 target = example["target"]
                 if isinstance(target, str):
@@ -337,3 +474,7 @@ class Dataset:
     def get_text_tasks(self) -> list[Task]:
         """Get only text-only tasks."""
         return [task for task in self.tasks if not task.is_multimodal]
+
+    def get_exact_match_tasks(self) -> list[Task]:
+        """Get only exact string match tasks."""
+        return [task for task in self.tasks if task.answer_type == "exact_str_match"]

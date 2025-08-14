@@ -4,26 +4,33 @@ from scirex.task import Task
 
 
 class PromptTemplate:
-    """Configurable prompt templates with multimodal support."""
+    """Enhanced configurable prompt templates with exact match support."""
 
     def __init__(self, custom_templates: dict[str, str] | None = None):
         self.templates = {
-            "mcq": """Answer the following multiple choice question about chemistry.
+            "mcq": """Answer the following multiple choice question.
 
 Question: {question}
 
 Options:
 {options}
 
-Instructions: Respond with only the letter(s) of the correct answer(s).
-If multiple answers are correct, separate them with commas.
+Instructions: Think through the problem step by step, then provide your final answer in the format \boxed{letter(s)}.
+If multiple answers are correct, separate them with commas inside the box.
 
 Answer:""",
-            "numeric": """Answer the following chemistry question with a numerical value.
+            "numeric": """Answer the following question with a numerical value.
 
 Question: {question}
 
-Instructions: Respond with only the numerical answer. Do not include units.
+Instructions: Think through the problem step by step, then provide your final numerical answer in the format \boxed{number}. Do not include units in the box.
+
+Answer:""",
+            "exact_str_match": """Answer the following question with the exact answer.
+
+Question: {question}
+
+Instructions: Think through the problem step by step, then provide your exact final answer in the format \boxed{answer}.
 
 Answer:""",
             "parse_mcq": """Extract the answer from the following response to a multiple choice question.
@@ -41,8 +48,14 @@ Response: {response}
 Instructions: Return only the number. If no clear numerical answer is found, return 'UNCLEAR'.
 
 Answer:""",
-            # New multimodal templates
-            "mcq_multimodal": """Answer the following multiple choice question about chemistry.
+            "parse_exact_str_match": """Extract the exact answer from the following response.
+
+Response: {response}
+
+Instructions: Return only the direct answer, removing any extra explanation or formatting. If no clear answer is found, return 'UNCLEAR'.
+
+Answer:""",
+            "mcq_multimodal": """Answer the following multiple choice question.
 
 {content}
 
@@ -53,11 +66,18 @@ Instructions: Respond with only the letter(s) of the correct answer(s).
 If multiple answers are correct, separate them with commas.
 
 Answer:""",
-            "numeric_multimodal": """Answer the following chemistry question with a numerical value.
+            "numeric_multimodal": """Answer the following question with a numerical value.
 
 {content}
 
 Instructions: Respond with only the numerical answer. Do not include units.
+
+Answer:""",
+            "exact_str_match_multimodal": """Answer the following question with the exact answer.
+
+{content}
+
+Instructions: Provide the exact answer as requested. Be precise and concise.
 
 Answer:""",
         }
@@ -85,16 +105,20 @@ Answer:""",
         else:
             return self.templates["numeric"].format(question=task.question)
 
+    def format_exact_match_prompt(self, task: Task) -> str | list[Any]:
+        """Format exact string match prompt with multimodal support."""
+        if task.is_multimodal:
+            return self._format_multimodal_exact_match_prompt(task)
+        else:
+            return self.templates["exact_str_match"].format(question=task.question)
+
     def _format_multimodal_mcq_prompt(self, task: Task, options: list[str]) -> list[Any]:
         """Format multimodal MCQ prompt."""
-        # Get the resolved multimodal content
         content_parts = task.resolve_multimodal_content()
-
-        # Create the prompt structure
         prompt_parts = []
 
         # Add initial instruction
-        prompt_parts.append("Answer the following multiple choice question about chemistry.\n")
+        prompt_parts.append("Answer the following multiple choice question.\n")
 
         # Add the multimodal content
         prompt_parts.extend(content_parts)
@@ -107,14 +131,11 @@ Answer:""",
 
     def _format_multimodal_numeric_prompt(self, task: Task) -> list[Any]:
         """Format multimodal numeric prompt."""
-        # Get the resolved multimodal content
         content_parts = task.resolve_multimodal_content()
-
-        # Create the prompt structure
         prompt_parts = []
 
         # Add initial instruction
-        prompt_parts.append("Answer the following chemistry question with a numerical value.\n")
+        prompt_parts.append("Answer the following question with a numerical value.\n")
 
         # Add the multimodal content
         prompt_parts.extend(content_parts)
@@ -125,9 +146,29 @@ Answer:""",
 
         return prompt_parts
 
+    def _format_multimodal_exact_match_prompt(self, task: Task) -> list[Any]:
+        """Format multimodal exact string match prompt."""
+        content_parts = task.resolve_multimodal_content()
+        prompt_parts = []
+
+        # Add initial instruction
+        prompt_parts.append("Answer the following question with the exact answer.\n")
+
+        # Add the multimodal content
+        prompt_parts.extend(content_parts)
+
+        # Add final instructions
+        instruction_text = "\n\nInstructions: Provide the exact answer as requested. Be precise and concise.\n\nAnswer:"
+        prompt_parts.append(instruction_text)
+
+        return prompt_parts
+
     def format_parse_prompt(self, response: str, answer_type: str) -> str:
-        """Format parsing prompt (remains text-only)."""
+        """Format parsing prompt for all answer types."""
         template_key = f"parse_{answer_type}"
+        if template_key not in self.templates:
+            # Fallback to exact string match for unknown types
+            template_key = "parse_exact_str_match"
         return self.templates[template_key].format(response=response)
 
     def _flatten_content_for_text(self, content_parts: list[Any]) -> str:
@@ -168,6 +209,8 @@ Answer:""",
             prompt = self.format_mcq_prompt(task)
         elif prompt_type == "numeric":
             prompt = self.format_numeric_prompt(task)
+        elif prompt_type == "exact_str_match":
+            prompt = self.format_exact_match_prompt(task)
         else:
             return f"Unknown prompt type: {prompt_type}"
 
@@ -176,3 +219,24 @@ Answer:""",
             return self._flatten_content_for_text(prompt)
         else:
             return prompt
+
+    def get_supported_answer_types(self) -> list[str]:
+        """Get list of supported answer types."""
+        return ["mcq", "numeric", "exact_str_match"]
+
+    def add_custom_template(self, answer_type: str, template: str, multimodal_template: str = None):
+        """Add a custom template for a new answer type."""
+        self.templates[answer_type] = template
+        if multimodal_template:
+            self.templates[f"{answer_type}_multimodal"] = multimodal_template
+
+        # Also add a parse template if not exists
+        parse_key = f"parse_{answer_type}"
+        if parse_key not in self.templates:
+            self.templates[parse_key] = f"""Extract the answer from the following response.
+
+Response: {{response}}
+
+Instructions: Return only the answer. If no clear answer is found, return 'UNCLEAR'.
+
+Answer:"""
