@@ -15,14 +15,50 @@ from scirex.task import Task
 
 
 class LLMParser:
-    """LLM-based answer parser with multimodal support."""
+    """Enhanced LLM-based answer parser with boxed format support."""
 
     def __init__(self, model: GeminiModel, prompt_template: PromptTemplate):
         self.model = model
         self.prompt_template = prompt_template
 
+    def _extract_from_boxed(self, response: str) -> str | None:
+        """
+        Extract content from \\boxed{} format.
+
+        Args:
+            response: The response text to search
+
+        Returns:
+            Content inside the box if found, None otherwise
+        """
+        # Look for \boxed{content} pattern
+        # Handle both \boxed{} and \\boxed{} formats
+        patterns = [
+            r"\\boxed\{([^}]*)\}",  # \boxed{content}
+            r"\boxed\{([^}]*)\}",  # boxed{content} (missing backslash)
+            r"\\boxed\{([^}]+)\}",  # Ensure non-empty content
+        ]
+
+        for pattern in patterns:
+            matches = re.findall(pattern, response, re.IGNORECASE)
+            if matches:
+                # Return the last match (most likely the final answer)
+                return matches[-1].strip()
+
+        return None
+
     def parse_mcq_answer(self, response: str) -> list[str]:
-        """Parse MCQ answer using LLM."""
+        """Parse MCQ answer, first trying boxed format, then LLM fallback."""
+        # First try to extract from boxed format
+        boxed_content = self._extract_from_boxed(response)
+
+        if boxed_content:
+            # Extract letters from boxed content
+            letters = re.findall(r"[A-Z]", boxed_content.upper())
+            if letters:
+                return letters
+
+        # Fallback to LLM parsing
         parse_prompt = self.prompt_template.format_parse_prompt(response, "mcq")
         parsed = self.model.generate(parse_prompt).strip()
 
@@ -34,7 +70,21 @@ class LLMParser:
         return letters
 
     def parse_numeric_answer(self, response: str) -> float | None:
-        """Parse numeric answer using LLM."""
+        """Parse numeric answer, first trying boxed format, then LLM fallback."""
+        # First try to extract from boxed format
+        boxed_content = self._extract_from_boxed(response)
+
+        if boxed_content:
+            # Try to parse as number
+            try:
+                # Clean the content (remove common non-numeric chars)
+                cleaned = re.sub(r"[^\d\.\-\+eE]", "", boxed_content)
+                if cleaned:
+                    return float(cleaned)
+            except ValueError:
+                pass
+
+        # Fallback to LLM parsing
         parse_prompt = self.prompt_template.format_parse_prompt(response, "numeric")
         parsed = self.model.generate(parse_prompt).strip()
 
@@ -46,9 +96,79 @@ class LLMParser:
         except ValueError:
             return None
 
+    def parse_exact_match_answer(self, response: str) -> str | None:
+        """Parse exact string match answer, first trying boxed format, then LLM fallback."""
+        # First try to extract from boxed format
+        boxed_content = self._extract_from_boxed(response)
+
+        if boxed_content:
+            return boxed_content.strip()
+
+        # Fallback to LLM parsing
+        parse_prompt = self.prompt_template.format_parse_prompt(response, "exact_str_match")
+        parsed = self.model.generate(parse_prompt).strip()
+
+        if parsed == "UNCLEAR":
+            return None
+
+        return parsed
+
+    def get_boxed_extraction_stats(self, responses: list[str]) -> dict[str, Any]:
+        """
+        Get statistics on how often boxed format was found and used.
+        Useful for monitoring prompt compliance.
+        """
+        total_responses = len(responses)
+        boxed_found = 0
+
+        for response in responses:
+            if self._extract_from_boxed(response):
+                boxed_found += 1
+
+        return {
+            "total_responses": total_responses,
+            "boxed_found": boxed_found,
+            "boxed_rate": boxed_found / total_responses if total_responses > 0 else 0.0,
+            "fallback_rate": (total_responses - boxed_found) / total_responses if total_responses > 0 else 0.0,
+        }
+
+    def debug_parsing(self, response: str, answer_type: str) -> dict[str, Any]:
+        """
+        Debug parsing process - shows both boxed extraction and LLM parsing results.
+        Useful for troubleshooting parsing issues.
+        """
+        boxed_content = self._extract_from_boxed(response)
+
+        # Get LLM parsing result
+        parse_prompt = self.prompt_template.format_parse_prompt(response, answer_type)
+        llm_parsed = self.model.generate(parse_prompt).strip()
+
+        debug_info = {
+            "original_response": response,
+            "answer_type": answer_type,
+            "boxed_found": boxed_content is not None,
+            "boxed_content": boxed_content,
+            "llm_parsed": llm_parsed,
+            "used_method": "boxed" if boxed_content else "llm",
+        }
+
+        # Get final parsed result
+        if answer_type == "mcq":
+            final_result = self.parse_mcq_answer(response)
+        elif answer_type == "numeric":
+            final_result = self.parse_numeric_answer(response)
+        elif answer_type == "exact_str_match":
+            final_result = self.parse_exact_match_answer(response)
+        else:
+            final_result = None
+
+        debug_info["final_result"] = final_result
+
+        return debug_info
+
 
 class Evaluator:
-    """Evaluates model performance."""
+    """Enhanced evaluator with exact string match support."""
 
     def evaluate_mcq(self, predicted: list[str], target_scores: dict[str, float]) -> dict[str, float]:
         """Evaluate MCQ prediction."""
@@ -89,23 +209,51 @@ class Evaluator:
 
         return {"accuracy": accuracy, "mae": mae}
 
+    def evaluate_exact_match(self, predicted: str | None, target: str) -> dict[str, float]:
+        """Evaluate exact string match prediction."""
+        if predicted is None:
+            return {"accuracy": 0.0, "exact_match": 0.0}
+
+        # Clean both strings for comparison
+        predicted_clean = predicted.strip()
+        target_clean = target.strip()
+
+        # Exact match
+        exact_match = float(predicted_clean == target_clean)
+
+        # Case-insensitive match
+        case_insensitive_match = float(predicted_clean.lower() == target_clean.lower())
+
+        # Contains match (predicted contains target or vice versa)
+        contains_match = float(
+            target_clean.lower() in predicted_clean.lower() or predicted_clean.lower() in target_clean.lower()
+        )
+
+        return {
+            "accuracy": exact_match,  # Use exact match as primary accuracy metric
+            "exact_match": exact_match,
+            "case_insensitive_match": case_insensitive_match,
+            "contains_match": contains_match,
+        }
+
 
 @dataclass
 class BenchmarkResult:
-    """Results from benchmark evaluation with multimodal support."""
+    """Enhanced results from benchmark evaluation."""
 
     task: Task
     response: str  # Keep for backward compatibility
-    parsed_answer: list[str] | float | None
+    parsed_answer: list[str] | float | str | None  # Updated to include string answers
     metrics: dict[str, float]
     success: bool
 
     # Rich response data
     full_response: GeminiResponse | None = None
 
-    # Multimodal specific fields
+    # Enhanced fields
     is_multimodal: bool = False
-    content_type: str = "text"  # "text", "multimodal", etc.
+    content_type: str = "text"  # "text", "multimodal", "text_fallback", etc.
+    answer_type: str = "unknown"  # "mcq", "numeric", "exact_str_match"
 
     @property
     def thought_summary(self) -> str | None:
@@ -126,7 +274,7 @@ class BenchmarkResult:
 
 
 class Benchmark:
-    """Main benchmark orchestrator with multimodal support."""
+    """Enhanced benchmark orchestrator with exact string match support."""
 
     def __init__(
         self,
@@ -150,7 +298,7 @@ class Benchmark:
             logger.info(f"Multimodal support: {'✓' if self.multimodal_supported else '✗'}")
 
     def run_single_task(self, task: Task) -> BenchmarkResult:
-        """Run benchmark on a single task with multimodal support."""
+        """Run benchmark on a single task with enhanced answer type support."""
         try:
             # Check if task is multimodal but model doesn't support it
             if task.is_multimodal and not self.multimodal_supported:
@@ -173,20 +321,25 @@ class Benchmark:
             full_response = self.model.generate(prompt, return_full_response=True)
             response = full_response.text
 
-            # Parse answer using text representation for parsing
-            text_for_parsing = task.get_text_content() if task.is_multimodal else task.question
-
+            # Parse answer based on task type
             if task.answer_type == "mcq":
                 parsed_answer = self.parser.parse_mcq_answer(response)
                 metrics = self.evaluator.evaluate_mcq(parsed_answer, task.target)
-            else:
+            elif task.answer_type == "numeric":
                 parsed_answer = self.parser.parse_numeric_answer(response)
                 metrics = self.evaluator.evaluate_numeric(parsed_answer, task.target, self.tolerance)
+            elif task.answer_type == "exact_str_match":
+                parsed_answer = self.parser.parse_exact_match_answer(response)
+                metrics = self.evaluator.evaluate_exact_match(parsed_answer, task.target)
+            else:
+                logger.warning(f"Unknown answer type '{task.answer_type}' for task {task.uuid}")
+                parsed_answer = None
+                metrics = {"accuracy": 0.0}
 
             success = True
 
         except Exception as e:
-            logger.info(f"Error processing task {task.uuid}: {e}")
+            logger.error(f"Error processing task {task.uuid}: {e}")
             response = ""
             parsed_answer = None
             metrics = {"accuracy": 0.0}
@@ -203,14 +356,20 @@ class Benchmark:
             full_response=full_response if success else None,
             is_multimodal=task.is_multimodal,
             content_type=content_type,
+            answer_type=task.answer_type,
         )
 
     def _format_multimodal_prompt(self, task: Task) -> list[Any]:
         """Format prompt for multimodal task."""
         if task.answer_type == "mcq":
             return self.prompt_template.format_mcq_prompt(task)
-        else:
+        elif task.answer_type == "numeric":
             return self.prompt_template.format_numeric_prompt(task)
+        elif task.answer_type == "exact_str_match":
+            return self.prompt_template.format_exact_match_prompt(task)
+        else:
+            # Fallback to text prompt
+            return self.prompt_template.format_exact_match_prompt(task)
 
     def _format_text_prompt(self, task: Task, text_content: str) -> str:
         """Format prompt for text-only task."""
@@ -228,42 +387,56 @@ class Benchmark:
 
         if task.answer_type == "mcq":
             return self.prompt_template.format_mcq_prompt(temp_task)
-        else:
+        elif task.answer_type == "numeric":
             return self.prompt_template.format_numeric_prompt(temp_task)
+        elif task.answer_type == "exact_str_match":
+            return self.prompt_template.format_exact_match_prompt(temp_task)
+        else:
+            # Fallback
+            return self.prompt_template.format_exact_match_prompt(temp_task)
 
     def run_benchmark(self, dataset: Dataset, max_tasks: int | None = None) -> list[BenchmarkResult]:
-        """Run benchmark on dataset with multimodal support."""
+        """Run benchmark on dataset with enhanced answer type support."""
         tasks = dataset.tasks[:max_tasks] if max_tasks else dataset.tasks
         results = []
 
-        # logger.info dataset statistics
+        # Enhanced dataset statistics
         total_tasks = len(tasks)
         multimodal_tasks = len([t for t in tasks if t.is_multimodal])
         text_tasks = total_tasks - multimodal_tasks
+
+        # Count by answer type
+        mcq_tasks = len([t for t in tasks if t.answer_type == "mcq"])
+        numeric_tasks = len([t for t in tasks if t.answer_type == "numeric"])
+        exact_match_tasks = len([t for t in tasks if t.answer_type == "exact_str_match"])
 
         logger.info(f"Dataset statistics:")
         logger.info(f"  Total tasks: {total_tasks}")
         logger.info(f"  Text-only tasks: {text_tasks}")
         logger.info(f"  Multimodal tasks: {multimodal_tasks}")
+        logger.info(f"  MCQ tasks: {mcq_tasks}")
+        logger.info(f"  Numeric tasks: {numeric_tasks}")
+        logger.info(f"  Exact match tasks: {exact_match_tasks}")
 
         for i, task in enumerate(tasks):
             task_type = "multimodal" if task.is_multimodal else "text"
-            logger.info(f"Processing task {i + 1}/{len(tasks)} ({task_type}): {task.name}")
+            logger.info(f"Processing task {i + 1}/{len(tasks)} ({task_type}, {task.answer_type}): {task.name}")
             result = self.run_single_task(task)
             results.append(result)
 
         return results
 
     def compute_summary_metrics(self, results: list[BenchmarkResult]) -> dict[str, Any]:
-        """Compute summary metrics across all results with multimodal breakdown."""
+        """Compute enhanced summary metrics across all results."""
         successful_results = [r for r in results if r.success]
 
         if not successful_results:
             return {"total_tasks": len(results), "successful_tasks": 0}
 
         # Separate by task type
-        mcq_results = [r for r in successful_results if r.task.answer_type == "mcq"]
-        numeric_results = [r for r in successful_results if r.task.answer_type == "numeric"]
+        mcq_results = [r for r in successful_results if r.answer_type == "mcq"]
+        numeric_results = [r for r in successful_results if r.answer_type == "numeric"]
+        exact_match_results = [r for r in successful_results if r.answer_type == "exact_str_match"]
 
         # Separate by modality
         text_results = [r for r in successful_results if not r.is_multimodal]
@@ -275,6 +448,9 @@ class Benchmark:
             "success_rate": len(successful_results) / len(results),
             "text_tasks": len(text_results),
             "multimodal_tasks": len(multimodal_results),
+            "mcq_tasks": len(mcq_results),
+            "numeric_tasks": len(numeric_results),
+            "exact_match_tasks": len(exact_match_results),
         }
 
         # MCQ metrics
@@ -294,6 +470,14 @@ class Benchmark:
                     numeric_metrics[metric] = sum(values) / len(values)
             summary["numeric"] = numeric_metrics
 
+        # Exact match metrics
+        if exact_match_results:
+            exact_match_metrics = {}
+            for metric in ["accuracy", "exact_match", "case_insensitive_match", "contains_match"]:
+                values = [r.metrics.get(metric, 0.0) for r in exact_match_results]
+                exact_match_metrics[metric] = sum(values) / len(values)
+            summary["exact_str_match"] = exact_match_metrics
+
         # Modality-specific metrics
         if text_results:
             text_accuracy = sum(r.metrics["accuracy"] for r in text_results) / len(text_results)
@@ -308,7 +492,7 @@ class Benchmark:
     def save_results_to_json(
         self, results: list[BenchmarkResult], output_path: str | Path, include_summary: bool = True
     ) -> None:
-        """Save benchmark results to JSON file with multimodal metadata."""
+        """Save enhanced benchmark results to JSON file."""
         output_path = Path(output_path)
 
         # Convert results to serializable format
@@ -324,7 +508,8 @@ class Benchmark:
                     "answer_type": result.task.answer_type,
                     "target": result.task.target,
                     "is_multimodal": result.task.is_multimodal,
-                    "input_template": result.task.input_template if result.task.is_multimodal else None,
+                    "preferred_score": result.task.preferred_score,
+                    "question_template": result.task.question_template,
                 },
                 "response": result.response,
                 "parsed_answer": result.parsed_answer,
@@ -332,6 +517,7 @@ class Benchmark:
                 "success": result.success,
                 "is_multimodal": result.is_multimodal,
                 "content_type": result.content_type,
+                "answer_type": result.answer_type,
                 # Rich response data
                 "full_response": result.full_response.to_dict() if result.full_response else None,
                 # Convenience fields
@@ -377,7 +563,7 @@ class Benchmark:
         logger.info(f"Estimated cost: ${total_cost_estimate:.4f}")
 
     def _compute_token_stats(self, results: list[BenchmarkResult]) -> dict[str, Any]:
-        """Compute token usage statistics with multimodal breakdown."""
+        """Compute enhanced token usage statistics."""
         token_stats = {
             "total_tokens": 0,
             "total_prompt_tokens": 0,
@@ -388,6 +574,9 @@ class Benchmark:
             "min_tokens_single_task": 0,
             "text_task_tokens": 0,
             "multimodal_task_tokens": 0,
+            "mcq_task_tokens": 0,
+            "numeric_task_tokens": 0,
+            "exact_match_task_tokens": 0,
         }
 
         valid_results = [r for r in results if hasattr(r, "total_tokens") and r.total_tokens > 0]
@@ -405,6 +594,14 @@ class Benchmark:
             else:
                 token_stats["text_task_tokens"] += tokens
 
+            # Track by answer type
+            if result.answer_type == "mcq":
+                token_stats["mcq_task_tokens"] += tokens
+            elif result.answer_type == "numeric":
+                token_stats["numeric_task_tokens"] += tokens
+            elif result.answer_type == "exact_str_match":
+                token_stats["exact_match_task_tokens"] += tokens
+
             # Track min/max
             token_stats["max_tokens_single_task"] = max(token_stats["max_tokens_single_task"], tokens)
             if token_stats["min_tokens_single_task"] == 0:
@@ -416,7 +613,3 @@ class Benchmark:
             token_stats["avg_tokens_per_task"] = token_stats["total_tokens"] / len(valid_results)
 
         return token_stats
-
-    def load_results_from_json(self, input_path: str | Path) -> tuple[list[BenchmarkResult], dict[str, Any]]:
-        """Load benchmark results from JSON file."""
-        pass
