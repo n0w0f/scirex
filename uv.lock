@@ -3259,6 +3259,15 @@ wheels = [
 ]
 
 [[package]]
+name = "schemdraw"
+version = "0.21"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6b/39/9b1c6e592f41249722f2afb2c3f2232792581e8bee53e1c111e8c61d57bd/schemdraw-0.21.tar.gz", hash = "sha256:6127b28d8fe0a8c78d37aa2dff93c1d39f18da84e59172f865b8fbd7664af386", size = 5368174, upload-time = "2025-07-27T18:06:09.97Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fb/24/3333ee8006a466b0918cdaf3e4770df6b8a4d03965d8f43156bff493e1ef/schemdraw-0.21-py3-none-any.whl", hash = "sha256:b5bee2fa63e7a876dfd7478bcc7131325ead2bf7769056ee3e7873a57d799bd5", size = 136918, upload-time = "2025-07-27T18:05:43.9Z" },
+]
+
+[[package]]
 name = "scipy"
 version = "1.13.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3425,6 +3434,7 @@ dependencies = [
     { name = "mkdocs-mermaid2-plugin" },
     { name = "pillow" },
     { name = "python-dotenv" },
+    { name = "schemdraw" },
     { name = "scipy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
     { name = "scipy", version = "1.16.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -3457,6 +3467,7 @@ requires-dist = [
     { name = "mkdocs-mermaid2-plugin", specifier = ">=1.2.1" },
     { name = "pillow", specifier = ">=11.3.0" },
     { name = "python-dotenv", specifier = ">=1.1.0" },
+    { name = "schemdraw", specifier = ">=0.21" },
     { name = "scipy", specifier = ">=1.13.1" },
 ]
 
