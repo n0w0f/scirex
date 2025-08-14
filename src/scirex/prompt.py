@@ -15,7 +15,7 @@ Question: {question}
 Options:
 {options}
 
-Instructions: Think through the problem step by step, then provide your final answer in the format \boxed{letter(s)}.
+Instructions: Think through the problem step by step, then provide your final answer in the format \\boxed{{letter(s)}}.
 If multiple answers are correct, separate them with commas inside the box.
 
 Answer:""",
@@ -23,14 +23,14 @@ Answer:""",
 
 Question: {question}
 
-Instructions: Think through the problem step by step, then provide your final numerical answer in the format \boxed{number}. Do not include units in the box.
+Instructions: Think through the problem step by step, then provide your final numerical answer in the format \\boxed{{number}}. Do not include units in the box.
 
 Answer:""",
             "exact_str_match": """Answer the following question with the exact answer.
 
 Question: {question}
 
-Instructions: Think through the problem step by step, then provide your exact final answer in the format \boxed{answer}.
+Instructions: Think through the problem step by step, then provide your exact final answer in the format \\boxed{{answer}}.
 
 Answer:""",
             "parse_mcq": """Extract the answer from the following response to a multiple choice question.
